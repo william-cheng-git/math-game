@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Math Blast! 🚀 Kid-Friendly Arithmetic Game</title>
+  <meta name="description" content="A fun, kid-friendly arithmetic practice game with customizable difficulty, bonus time for tough problems, instant feedback, and progress trend charts.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+  
+  <!-- Google Fonts: Fredoka & Quicksand for playful, kid-friendly typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="./styles.css">
+
+  <!-- Chart.js for Accuracy Pie Chart and Progress Trend Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <!-- Canvas Confetti for celebratory animations -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+</head>
+<body>
+  <!-- Background Floating Math Doodles -->
+  <div class="bg-decorations" aria-hidden="true">
+    <span class="bubble b1">+</span>
+    <span class="bubble b2">×</span>
+    <span class="bubble b3">÷</span>
+    <span class="bubble b4">−</span>
+    <span class="bubble b5">=</span>
+    <span class="bubble b6">★</span>
+    <span class="bubble b7">7</span>
+    <span class="bubble b8">9</span>
+  </div>
+
+  <div class="app-container">
+    <!-- Top Global Navigation & Controls -->
+    <header class="game-header">
+      <div class="logo-group" id="header-home-btn" role="button" tabindex="0" title="Back to Settings">
+        <span class="mascot-icon" aria-hidden="true">🌟</span>
+        <div class="title-text">
+          <h1 class="game-title">Math Blast!</h1>
+          <span class="game-tagline">Super Number Adventure</span>
+        </div>
+      </div>
+      
+      <div class="header-controls">
+        <button id="btn-sound-toggle" class="btn-icon" aria-label="Toggle Sound" title="Sound Effects On/Off">
+          <span id="sound-icon" class="icon">🔊</span>
+          <span class="btn-text">Sound</span>
+        </button>
+        <button id="btn-open-history" class="btn-icon" aria-label="View Progress & Trends" title="View Progress History">
+          <span class="icon">📈</span>
+          <span class="btn-text">Stats</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN VIEWS WRAPPER -->
+    <main id="main-content">
+
+      <!-- ==============================================
+           SCREEN 1: CONFIGURATION & SETUP SCREEN
+           ============================================== -->
+      <section id="screen-config" class="screen active" aria-labelledby="config-heading">
+        <div class="card config-card">
+          <div class="config-hero">
+            <div class="hero-mascot" aria-hidden="true">🚀</div>
+            <h2 id="config-heading" class="hero-title">Ready for a Math Challenge?</h2>
+            <p class="hero-subtitle">Choose your level, pick your operations, and blast off!</p>
+          </div>
+
+          <!-- Difficulty Presets -->
+          <div class="config-section">
+            <label class="section-label">
+              <span class="label-icon">🎯</span>
+              <span class="label-title">Choose Difficulty Level</span>
+            </label>
+            <div class="preset-grid" role="radiogroup" aria-label="Difficulty Level">
+              <button type="button" class="preset-card active" data-preset="easy" role="radio" aria-checked="true">
+                <span class="preset-badge">Starter</span>
+                <span class="preset-icon">🌱</span>
+                <span class="preset-name">Easy</span>
+                <span class="preset-desc">Single-digit + & − (e.g. 4 + 5)</span>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="medium" role="radio" aria-checked="false">
+                <span class="preset-badge">Explorer</span>
+                <span class="preset-icon">⚡</span>
+                <span class="preset-name">Medium</span>
+                <span class="preset-desc">Up to 20 with +, − & simple ×</span>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="hard" role="radio" aria-checked="false">
+                <span class="preset-badge">Champion</span>
+                <span class="preset-icon">🏆</span>
+                <span class="preset-name">Hard</span>
+                <span class="preset-desc">Up to 100 with +, −, × & exact ÷</span>
+              </button>
+
+              <button type="button" class="preset-card" data-preset="custom" role="radio" aria-checked="false">
+                <span class="preset-badge">Custom</span>
+                <span class="preset-icon">⚙️</span>
+                <span class="preset-name">Custom</span>
+                <span class="preset-desc">Pick your own math rules!</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Operations Toggle -->
+          <div class="config-section">
+            <div class="section-label-row">
+              <label class="section-label">
+                <span class="label-icon">➕</span>
+                <span class="label-title">Operations</span>
+              </label>
+              <span class="section-hint" id="op-hint">Included in this round:</span>
+            </div>
+            
+            <div class="operations-grid" role="group" aria-label="Select Operations">
+              <label class="op-chip" for="op-add">
+                <input type="checkbox" id="op-add" value="add" checked>
+                <span class="op-symbol">+</span>
+                <span class="op-name">Addition</span>
+              </label>
+
+              <label class="op-chip" for="op-sub">
+                <input type="checkbox" id="op-sub" value="sub" checked>
+                <span class="op-symbol">−</span>
+                <span class="op-name">Subtraction</span>
+              </label>
+
+              <label class="op-chip" for="op-mul">
+                <input type="checkbox" id="op-mul" value="mul">
+                <span class="op-symbol">×</span>
+                <span class="op-name">Multiplication</span>
+              </label>
+
+              <label class="op-chip" for="op-div">
+                <input type="checkbox" id="op-div" value="div">
+                <span class="op-symbol">÷</span>
+                <span class="op-name">Division</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Starting Time Allowed -->
+          <div class="config-section">
+            <label class="section-label">
+              <span class="label-icon">⏱️</span>
+              <span class="label-title">Starting Time</span>
+            </label>
+            <div class="timer-chips-grid" role="radiogroup" aria-label="Timer Duration">
+              <button type="button" class="timer-chip" data-time="30">30s <span>Sprint</span></button>
+              <button type="button" class="timer-chip active" data-time="60">60s <span>Standard</span></button>
+              <button type="button" class="timer-chip" data-time="90">90s <span>Endurance</span></button>
+              <button type="button" class="timer-chip" data-time="120">120s <span>Marathon</span></button>
+              <div class="custom-time-wrapper">
+                <label for="custom-time-input" class="sr-only">Custom seconds</label>
+                <input type="number" id="custom-time-input" min="15" max="300" placeholder="Custom" aria-label="Custom seconds">
+                <span class="unit">sec</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bonus Time Explanation Card -->
+          <div class="bonus-explainer-banner">
+            <span class="explainer-icon">💡</span>
+            <div class="explainer-text">
+              <strong>Earn Bonus Seconds!</strong> Harder math questions reward you with <strong>+2s to +5s extra time</strong> on the clock when answered correctly! Take your time and think carefully.
+            </div>
+          </div>
+
+          <!-- Current Best Record Preview -->
+          <div class="best-record-pill" id="config-best-record">
+            <span class="trophy-emoji">🏆</span>
+            <span class="record-text">Best for <strong id="best-preset-name">Easy</strong>: <span id="best-score-val">0 pts</span> (<span id="best-acc-val">0%</span> accuracy)</span>
+          </div>
+
+          <!-- Prominent Start Game Button -->
+          <div class="config-actions">
+            <button id="btn-start-game" class="btn btn-primary btn-large btn-glow">
+              <span class="btn-emoji">🚀</span>
+              <span class="btn-caption">START GAME</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SCREEN 2: ACTIVE GAMEPLAY SCREEN
+           ============================================== -->
+      <section id="screen-game" class="screen" aria-labelledby="game-active-heading">
+        <h2 id="game-active-heading" class="sr-only">Math Blast Game in Progress</h2>
+        
+        <!-- Live Game Stats Bar -->
+        <div class="game-hud">
+          <!-- Score Box -->
+          <div class="hud-card score-card">
+            <span class="hud-label">SCORE</span>
+            <div class="hud-value" id="hud-score">0</div>
+            <div class="score-popup" id="score-popup" aria-hidden="true"></div>
+          </div>
+
+          <!-- Urgency Countdown Clock -->
+          <div class="hud-card timer-card" id="hud-timer-container">
+            <span class="hud-label">TIME LEFT</span>
+            <div class="timer-display-group">
+              <div class="timer-value" id="hud-timer">60</div>
+              <span class="timer-unit">s</span>
+            </div>
+            <!-- Progress Bar with Urgency Cue -->
+            <div class="timer-bar-track">
+              <div class="timer-bar-fill" id="timer-bar-fill"></div>
+            </div>
+            <!-- Bonus Time Floater Notification -->
+            <div class="bonus-time-popup" id="bonus-time-popup" aria-hidden="true">+3s!</div>
+          </div>
+
+          <!-- Streak Box -->
+          <div class="hud-card streak-card">
+            <span class="hud-label">STREAK</span>
+            <div class="hud-value" id="hud-streak">0 🔥</div>
+            <div class="streak-multiplier" id="hud-multiplier">1x</div>
+          </div>
+
+          <!-- Quit / Pause Button -->
+          <button id="btn-quit-game" class="btn-hud-action" title="Quit Round" aria-label="Quit game round">
+            ✕
+          </button>
+        </div>
+
+        <!-- Problem Playing Card -->
+        <div class="card game-card">
+          <!-- Question Difficulty Badge -->
+          <div class="question-meta-row">
+            <span class="difficulty-tier-badge" id="question-tier-badge">
+              ⭐ Level 1 <span class="tier-bonus-text">(+1s bonus)</span>
+            </span>
+            <span class="question-counter" id="question-counter">Question #1</span>
+          </div>
+
+          <!-- Large Visual Equation Display -->
+          <div class="equation-container">
+            <div class="equation-row" id="equation-display">
+              <span class="term-num" id="term-a">7</span>
+              <span class="term-op" id="term-op">+</span>
+              <span class="term-num" id="term-b">5</span>
+              <span class="term-equals">=</span>
+              <div class="user-answer-box" id="user-answer-box" tabindex="0" aria-live="polite">
+                <span class="answer-text" id="answer-text"></span>
+                <span class="cursor-caret" aria-hidden="true"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Encouraging Feedback Bubble -->
+          <div class="feedback-banner" id="feedback-banner" aria-live="assertive">
+            <span class="feedback-mascot" id="feedback-mascot">🌟</span>
+            <span class="feedback-msg" id="feedback-msg">Type your answer and tap GO!</span>
+          </div>
+
+          <!-- Kid-Friendly On-Screen Keypad -->
+          <div class="keypad-container">
+            <div class="keypad-grid" role="group" aria-label="On-Screen Number Keypad">
+              <button type="button" class="key-btn" data-key="1">1</button>
+              <button type="button" class="key-btn" data-key="2">2</button>
+              <button type="button" class="key-btn" data-key="3">3</button>
+
+              <button type="button" class="key-btn" data-key="4">4</button>
+              <button type="button" class="key-btn" data-key="5">5</button>
+              <button type="button" class="key-btn" data-key="6">6</button>
+
+              <button type="button" class="key-btn" data-key="7">7</button>
+              <button type="button" class="key-btn" data-key="8">8</button>
+              <button type="button" class="key-btn" data-key="9">9</button>
+
+              <button type="button" class="key-btn key-special key-clear" data-action="clear" aria-label="Clear answer">C</button>
+              <button type="button" class="key-btn" data-key="0">0</button>
+              <button type="button" class="key-btn key-special key-backspace" data-action="backspace" aria-label="Backspace">⌫</button>
+            </div>
+
+            <!-- Keypad Action Row -->
+            <div class="keypad-actions">
+              <button type="button" id="btn-skip-question" class="btn btn-secondary btn-skip" title="Skip this question">
+                <span class="btn-emoji">⏭️</span>
+                <span>Skip</span>
+              </button>
+              <button type="button" id="btn-submit-answer" class="btn btn-primary btn-submit" title="Submit answer">
+                <span class="btn-emoji">🚀</span>
+                <span>GO! (Enter)</span>
+              </button>
+            </div>
+
+            <p class="keyboard-hint" aria-hidden="true">
+              ⌨️ <em>Tip: You can also use your keyboard numbers & Enter key!</em>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
+           SCREEN 3: GAME OVER & SUMMARY SCREEN
+           ============================================== -->
+      <section id="screen-summary" class="screen" aria-labelledby="summary-heading">
+        <div class="card summary-card">
+          
+          <!-- High Score Alert Banner (Conditionally Shown) -->
+          <div id="high-score-banner" class="high-score-banner hidden" role="alert">
+            <span class="banner-sparkle">✨</span>
+            <div class="banner-content">
+              <h3 class="banner-title">🎉 NEW HIGH SCORE! 🎉</h3>
+              <p class="banner-subtitle">You beat your previous personal best! Incredible job!</p>
+            </div>
+            <span class="banner-sparkle">🏆</span>
+          </div>
+
+          <div class="summary-hero">
+            <div class="hero-badge-wrap">
+              <span class="summary-mascot" id="summary-mascot">🌟</span>
+            </div>
+            <h2 id="summary-heading" class="summary-title">Round Complete!</h2>
+            <p class="summary-subtitle" id="summary-compliment">Fantastic effort! Look at your math power:</p>
+          </div>
+
+          <!-- Key Metrics Grid -->
+          <div class="summary-metrics-grid">
+            <div class="metric-card metric-score">
+              <span class="metric-icon">⭐</span>
+              <span class="metric-title">Final Score</span>
+              <span class="metric-value" id="summary-score">0</span>
+            </div>
+
+            <div class="metric-card metric-accuracy">
+              <span class="metric-icon">🎯</span>
+              <span class="metric-title">Accuracy</span>
+              <span class="metric-value" id="summary-accuracy">0%</span>
+            </div>
+
+            <div class="metric-card metric-correct">
+              <span class="metric-icon">✅</span>
+              <span class="metric-title">Correct</span>
+              <span class="metric-value" id="summary-correct">0</span>
+            </div>
+
+            <div class="metric-card metric-skipped">
+              <span class="metric-icon">⏭️</span>
+              <span class="metric-title">Missed / Skipped</span>
+              <span class="metric-value" id="summary-missed">0</span>
+            </div>
+
+            <div class="metric-card metric-streak">
+              <span class="metric-icon">🔥</span>
+              <span class="metric-title">Best Streak</span>
+              <span class="metric-value" id="summary-streak">0</span>
+            </div>
+
+            <div class="metric-card metric-bonus">
+              <span class="metric-icon">⏱️</span>
+              <span class="metric-title">Bonus Time Earned</span>
+              <span class="metric-value" id="summary-bonus-earned">+0s</span>
+            </div>
+          </div>
+
+          <!-- Accuracy Rate Pie / Donut Chart -->
+          <div class="chart-section summary-chart-section">
+            <h3 class="chart-section-title">Accuracy Breakdown</h3>
+            <div class="pie-chart-wrapper">
+              <canvas id="accuracyChart" width="220" height="220" role="img" aria-label="Accuracy breakdown pie chart"></canvas>
+              <!-- SVG Fallback in case Chart.js is offline or CDN is blocked -->
+              <div id="accuracy-svg-fallback" class="svg-fallback-chart hidden"></div>
+            </div>
+            <div class="chart-legend-custom">
+              <span class="legend-item"><span class="legend-dot dot-correct"></span> Correct (<strong id="legend-correct-pct">0%</strong>)</span>
+              <span class="legend-item"><span class="legend-dot dot-missed"></span> Missed/Skipped (<strong id="legend-missed-pct">0%</strong>)</span>
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="summary-actions-row">
+            <button id="btn-play-again" class="btn btn-primary btn-large btn-glow">
+              <span class="btn-emoji">🔄</span>
+              <span>Play Again</span>
+            </button>
+            <button id="btn-change-settings" class="btn btn-secondary btn-large">
+              <span class="btn-emoji">⚙️</span>
+              <span>Change Settings</span>
+            </button>
+            <button id="btn-summary-history" class="btn btn-tertiary btn-large">
+              <span class="btn-emoji">📈</span>
+              <span>View Progress Trends</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ==============================================
+         PROGRESS, TRENDS & HISTORY MODAL
+         ============================================== -->
+    <div id="modal-history" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="modal-history-title">
+      <div class="modal-dialog">
+        <div class="modal-header">
+          <div class="modal-title-group">
+            <span class="modal-icon">📈</span>
+            <h2 id="modal-history-title" class="modal-title">Progress & Trend Graphs</h2>
+          </div>
+          <button id="btn-close-history" class="btn-modal-close" aria-label="Close dialog">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Overall Stats Summary -->
+          <div class="history-highlights-row">
+            <div class="highlight-item">
+              <span class="highlight-label">Total Games</span>
+              <span class="highlight-val" id="hist-total-games">0</span>
+            </div>
+            <div class="highlight-item">
+              <span class="highlight-label">All-Time Best Score</span>
+              <span class="highlight-val" id="hist-best-score">0</span>
+            </div>
+            <div class="highlight-item">
+              <span class="highlight-label">Avg. Accuracy</span>
+              <span class="highlight-val" id="hist-avg-accuracy">0%</span>
+            </div>
+          </div>
+
+          <!-- Trend Chart Container: Score & Accuracy Trends -->
+          <div class="trend-graphs-box">
+            <div class="trend-tabs" role="tablist">
+              <button type="button" id="tab-score-trend" class="trend-tab-btn active" role="tab" aria-selected="true">
+                ⭐ Score Trend
+              </button>
+              <button type="button" id="tab-accuracy-trend" class="trend-tab-btn" role="tab" aria-selected="false">
+                🎯 Accuracy % Trend
+              </button>
+            </div>
+
+            <!-- Score Trend Chart View -->
+            <div id="view-score-trend" class="trend-canvas-wrap">
+              <canvas id="scoreTrendChart" height="200" role="img" aria-label="Score progression trend chart"></canvas>
+              <div id="score-trend-svg-fallback" class="svg-fallback-chart hidden"></div>
+            </div>
+
+            <!-- Accuracy Trend Chart View -->
+            <div id="view-accuracy-trend" class="trend-canvas-wrap hidden">
+              <canvas id="accuracyTrendChart" height="200" role="img" aria-label="Accuracy percentage trend chart"></canvas>
+              <div id="acc-trend-svg-fallback" class="svg-fallback-chart hidden"></div>
+            </div>
+          </div>
+
+          <!-- Recent Games Log Table -->
+          <div class="history-table-container">
+            <h3 class="history-table-title">Recent Game History</h3>
+            <div class="table-scroll">
+              <table class="history-table" id="history-table">
+                <thead>
+                  <tr>
+                    <th>Date & Time</th>
+                    <th>Level</th>
+                    <th>Score</th>
+                    <th>Accuracy</th>
+                    <th>Correct</th>
+                    <th>Time</th>
+                  </tr>
+                </thead>
+                <tbody id="history-tbody">
+                  <!-- Populated by JavaScript -->
+                  <tr>
+                    <td colspan="6" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Storage Details & Clear History -->
+          <div class="storage-info-footer">
+            <div class="storage-pill">
+              <span class="storage-badge-icon">🍪</span>
+              <span id="storage-status-text">Saved securely in browser cookies & localStorage</span>
+            </div>
+            <button id="btn-clear-history" class="btn btn-danger-outline btn-small" title="Delete all saved game records">
+              🗑️ Clear History
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modal for Clearing History -->
+    <div id="modal-confirm-clear" class="modal-backdrop hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-clear-title">
+      <div class="modal-dialog modal-small">
+        <h3 id="confirm-clear-title" class="modal-title">Clear All History?</h3>
+        <p class="modal-text">Are you sure you want to reset all past game scores, accuracy stats, and trend data? This action cannot be undone.</p>
+        <div class="modal-actions-row">
+          <button id="btn-cancel-clear" class="btn btn-secondary">Cancel</button>
+          <button id="btn-confirm-clear" class="btn btn-danger">Yes, Reset All</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pause/Quit Confirmation Modal -->
+    <div id="modal-confirm-quit" class="modal-backdrop hidden" role="alertdialog" aria-modal="true" aria-labelledby="confirm-quit-title">
+      <div class="modal-dialog modal-small">
+        <h3 id="confirm-quit-title" class="modal-title">Quit Round?</h3>
+        <p class="modal-text">Do you want to end this round early and return to settings?</p>
+        <div class="modal-actions-row">
+          <button id="btn-resume-game" class="btn btn-primary">Keep Playing! 🚀</button>
+          <button id="btn-really-quit" class="btn btn-secondary">Quit Round</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer with attribution and deployment link -->
+    <footer class="app-footer">
+      <p>Math Blast! • 100% Client-Side &amp; GitHub Pages Ready • Safe &amp; Kid-Friendly Arithmetic Practice</p>
+    </footer>
+  </div>
+
+  <!-- Main JavaScript App -->
+  <script src="./app.js"></script>
+</body>
+</html>
