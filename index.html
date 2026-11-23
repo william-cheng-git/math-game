@@ -195,6 +195,15 @@
         
         <!-- Live Game Stats Bar -->
         <div class="game-hud">
+          <!-- Level Card -->
+          <div class="hud-card level-card">
+            <span class="hud-label">LEVEL</span>
+            <div class="hud-value" id="hud-level">1 ⭐</div>
+            <div class="level-progress-track" title="XP progress towards next level">
+              <div class="level-progress-fill" id="level-bar-fill"></div>
+            </div>
+          </div>
+
           <!-- Score Box -->
           <div class="hud-card score-card">
             <span class="hud-label">SCORE</span>
@@ -228,6 +237,32 @@
           <button id="btn-quit-game" class="btn-hud-action" title="Quit Round" aria-label="Quit game round">
             ✕
           </button>
+        </div>
+
+        <!-- Level-Up Celebratory Banner -->
+        <div id="level-up-banner" class="achievement-banner level-up-banner hidden" role="status" aria-live="polite">
+          <div class="achievement-icon-wrap">
+            <span class="achievement-anim-icon" id="level-up-icon">⭐</span>
+          </div>
+          <div class="achievement-text-group">
+            <span class="achievement-kicker">🎉 LEVEL UP!</span>
+            <h3 class="achievement-main-title" id="level-up-title">LEVEL 2: EXPLORER!</h3>
+            <p class="achievement-desc" id="level-up-desc">+5s Bonus Time! Harder math unlocked! 🚀</p>
+          </div>
+          <div class="achievement-badge-pill" id="level-up-badge">+5s ⏱️</div>
+        </div>
+
+        <!-- Streak Milestone Achievement Banner (5, 10, 20, 50, 100) -->
+        <div id="streak-achievement-banner" class="achievement-banner streak-achievement-banner hidden" role="status" aria-live="polite">
+          <div class="achievement-icon-wrap">
+            <span class="achievement-anim-icon" id="streak-achievement-icon">🔥</span>
+          </div>
+          <div class="achievement-text-group">
+            <span class="achievement-kicker" id="streak-achievement-kicker">🔥 STREAK MILESTONE!</span>
+            <h3 class="achievement-main-title" id="streak-achievement-title">5 IN A ROW!</h3>
+            <p class="achievement-desc" id="streak-achievement-desc">Super Streak! Extra bonus points earned!</p>
+          </div>
+          <div class="achievement-badge-pill streak-bonus-pill" id="streak-achievement-bonus">+25 PTS</div>
         </div>
 
         <!-- Problem Playing Card -->
@@ -329,6 +364,12 @@
               <span class="metric-icon">⭐</span>
               <span class="metric-title">Final Score</span>
               <span class="metric-value" id="summary-score">0</span>
+            </div>
+
+            <div class="metric-card metric-level">
+              <span class="metric-icon">🚀</span>
+              <span class="metric-title">Max Level</span>
+              <span class="metric-value" id="summary-level">Level 1</span>
             </div>
 
             <div class="metric-card metric-accuracy">
@@ -458,7 +499,8 @@
                 <thead>
                   <tr>
                     <th>Date & Time</th>
-                    <th>Level</th>
+                    <th>Mode</th>
+                    <th>Max Level</th>
                     <th>Score</th>
                     <th>Accuracy</th>
                     <th>Correct</th>
@@ -468,7 +510,7 @@
                 <tbody id="history-tbody">
                   <!-- Populated by JavaScript -->
                   <tr>
-                    <td colspan="6" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
+                    <td colspan="7" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
                   </tr>
                 </tbody>
               </table>

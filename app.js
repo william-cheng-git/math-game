@@ -59,7 +59,25 @@
     timerIntervalId: null,
     isPlaying: false,
     isPaused: false,
+    isSubmitting: false, // Prevents duplicate scoring on rapid Enter key or double clicks
     lastTickTime: 0,
+
+    // Level progression
+    playerLevel: 1,
+    highestLevelReached: 1,
+    levelTitles: [
+      '',
+      'Apprentice',
+      'Explorer',
+      'Adventurer',
+      'Champion',
+      'Master',
+      'Grandmaster',
+      'Mythic Hero',
+      'Legend'
+    ],
+    levelUpTimeoutId: null,
+    streakMilestoneTimeoutId: null,
 
     // Sound
     soundEnabled: true,
@@ -113,6 +131,8 @@
     btnStartGame: document.getElementById('btn-start-game'),
 
     // Gameplay Screen
+    hudLevel: document.getElementById('hud-level'),
+    levelBarFill: document.getElementById('level-bar-fill'),
     hudScore: document.getElementById('hud-score'),
     scorePopup: document.getElementById('score-popup'),
     hudTimer: document.getElementById('hud-timer'),
@@ -122,6 +142,18 @@
     hudStreak: document.getElementById('hud-streak'),
     hudMultiplier: document.getElementById('hud-multiplier'),
     btnQuitGame: document.getElementById('btn-quit-game'),
+
+    // Achievement Banners
+    levelUpBanner: document.getElementById('level-up-banner'),
+    levelUpTitle: document.getElementById('level-up-title'),
+    levelUpDesc: document.getElementById('level-up-desc'),
+    levelUpBadge: document.getElementById('level-up-badge'),
+    streakAchievementBanner: document.getElementById('streak-achievement-banner'),
+    streakAchievementIcon: document.getElementById('streak-achievement-icon'),
+    streakAchievementKicker: document.getElementById('streak-achievement-kicker'),
+    streakAchievementTitle: document.getElementById('streak-achievement-title'),
+    streakAchievementDesc: document.getElementById('streak-achievement-desc'),
+    streakAchievementBonus: document.getElementById('streak-achievement-bonus'),
 
     questionTierBadge: document.getElementById('question-tier-badge'),
     questionCounter: document.getElementById('question-counter'),
@@ -146,6 +178,7 @@
     summaryTitle: document.getElementById('summary-heading'),
     summaryCompliment: document.getElementById('summary-compliment'),
     summaryScore: document.getElementById('summary-score'),
+    summaryLevel: document.getElementById('summary-level'),
     summaryAccuracy: document.getElementById('summary-accuracy'),
     summaryCorrect: document.getElementById('summary-correct'),
     summaryMissed: document.getElementById('summary-missed'),
@@ -449,6 +482,35 @@
       });
     },
 
+    playLevelUp() {
+      if (!state.soundEnabled) return;
+      // Majestic ascending chime: C5, E5, G5, C6, E6 + high sparkle
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, idx) => {
+        this.playTone(freq, 'triangle', 0.26, 0.26, idx * 0.08);
+      });
+      setTimeout(() => {
+        this.playTone(1567.98, 'sine', 0.42, 0.22, 0); // G6 shimmer
+      }, 420);
+    },
+
+    playStreakMilestone(milestone) {
+      if (!state.soundEnabled) return;
+      if (milestone >= 50) {
+        // Godlike fanfare
+        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+        notes.forEach((freq, idx) => {
+          this.playTone(freq, 'triangle', 0.28, 0.28, idx * 0.07);
+        });
+      } else {
+        // High-energy victory arpeggio
+        const notes = [587.33, 739.99, 880, 1174.66, 1479.98];
+        notes.forEach((freq, idx) => {
+          this.playTone(freq, 'triangle', 0.22, 0.25, idx * 0.07);
+        });
+      }
+    },
+
     playHighScoreFanfare() {
       if (!state.soundEnabled) return;
       // Triumphant victory fanfare melody
@@ -503,171 +565,414 @@
       let basePoints = 10;
 
       const preset = state.preset;
+      const lvl = state.playerLevel || 1; // Adaptive difficulty proportional to player level!
 
       if (op === 'add') {
         symbol = '+';
         if (preset === 'easy') {
-          // Single digit: 1-9
-          a = this.randomInt(1, 9);
-          b = this.randomInt(1, 9);
-          answer = a + b;
-          if (answer <= 10) {
+          // Easy: single-digit progressing to teens as level increases
+          if (lvl === 1) {
+            a = this.randomInt(1, 5);
+            b = this.randomInt(1, 5);
             tier = 1;
-            tierName = 'Level 1 (Starter)';
+            tierName = 'Level 1 (Starter +)';
             bonusSeconds = 1;
             basePoints = 10;
-          } else {
+          } else if (lvl === 2) {
+            a = this.randomInt(3, 9);
+            b = this.randomInt(2, 9);
             tier = 2;
-            tierName = 'Level 2 (Carrying)';
+            tierName = 'Level 2 (Carrying +)';
             bonusSeconds = 2;
             basePoints = 20;
-          }
-        } else if (preset === 'medium') {
-          // Up to 20 or small 2-digit
-          const roll = Math.random();
-          if (roll < 0.4) {
-            a = this.randomInt(4, 15);
-            b = this.randomInt(3, 12);
-            answer = a + b;
-            tier = 2;
-            tierName = 'Level 2 (Up to 25)';
-            bonusSeconds = 2;
-            basePoints = 20;
-          } else {
-            a = this.randomInt(12, 28);
-            b = this.randomInt(9, 24);
-            answer = a + b;
+          } else if (lvl === 3) {
+            a = this.randomInt(6, 14);
+            b = this.randomInt(4, 9);
             tier = 3;
-            tierName = 'Level 3 (Double Digits)';
+            tierName = 'Level 3 (Teens +)';
             bonusSeconds = 3;
             basePoints = 35;
-          }
-        } else {
-          // Hard or Custom with large numbers: up to 100
-          const roll = Math.random();
-          if (roll < 0.5) {
-            a = this.randomInt(15, 48);
-            b = this.randomInt(12, 45);
-            answer = a + b;
-            tier = 3;
-            tierName = 'Level 3 (Addition)';
-            bonusSeconds = 3;
-            basePoints = 35;
-          } else {
-            a = this.randomInt(38, 75);
-            b = this.randomInt(24, 68);
-            answer = a + b;
+          } else if (lvl === 4) {
+            a = this.randomInt(10, 22);
+            b = this.randomInt(5, 14);
             tier = 4;
-            tierName = 'Level 4 (Big Addition)';
+            tierName = 'Level 4 (Double Digits)';
             bonusSeconds = 4;
             basePoints = 50;
+          } else {
+            // Level 5+
+            a = this.randomInt(15, 35);
+            b = this.randomInt(10, 25);
+            tier = 5;
+            tierName = `Level ${lvl} (Master +)`;
+            bonusSeconds = 5;
+            basePoints = 75;
           }
+          answer = a + b;
+        } else if (preset === 'medium') {
+          if (lvl === 1) {
+            a = this.randomInt(3, 12);
+            b = this.randomInt(2, 10);
+            tier = 1;
+            tierName = 'Level 1 (Basic +)';
+            bonusSeconds = 1;
+            basePoints = 15;
+          } else if (lvl === 2) {
+            a = this.randomInt(8, 20);
+            b = this.randomInt(5, 15);
+            tier = 2;
+            tierName = 'Level 2 (Regrouping +)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 3) {
+            a = this.randomInt(14, 32);
+            b = this.randomInt(10, 25);
+            tier = 3;
+            tierName = 'Level 3 (2-Digits +)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 4) {
+            a = this.randomInt(22, 50);
+            b = this.randomInt(16, 40);
+            tier = 4;
+            tierName = 'Level 4 (Harder +)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else {
+            a = this.randomInt(35, 75);
+            b = this.randomInt(25, 65);
+            tier = 5;
+            tierName = `Level ${lvl} (Master +)`;
+            bonusSeconds = 5;
+            basePoints = 75;
+          }
+          answer = a + b;
+        } else {
+          // Hard or Custom
+          if (lvl === 1) {
+            a = this.randomInt(15, 40);
+            b = this.randomInt(10, 35);
+            tier = 2;
+            tierName = 'Level 1 (Addition)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 2) {
+            a = this.randomInt(25, 60);
+            b = this.randomInt(18, 50);
+            tier = 3;
+            tierName = 'Level 2 (Big Addition)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 3) {
+            a = this.randomInt(40, 85);
+            b = this.randomInt(28, 75);
+            tier = 4;
+            tierName = 'Level 3 (Advanced +)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else if (lvl === 4) {
+            a = this.randomInt(60, 115);
+            b = this.randomInt(45, 95);
+            tier = 5;
+            tierName = 'Level 4 (Champion +)';
+            bonusSeconds = 5;
+            basePoints = 75;
+          } else {
+            a = this.randomInt(85, 175);
+            b = this.randomInt(65, 145);
+            tier = 5;
+            tierName = `Level ${lvl} (Mythic +)`;
+            bonusSeconds = 5;
+            basePoints = 90;
+          }
+          answer = a + b;
         }
       } else if (op === 'sub') {
         symbol = '−';
         if (preset === 'easy') {
-          // Single digit, always positive answer
-          a = this.randomInt(2, 9);
-          b = this.randomInt(1, a); // ensure a >= b
-          answer = a - b;
-          tier = 1;
-          tierName = 'Level 1 (Basic −)';
-          bonusSeconds = 1;
-          basePoints = 10;
-        } else if (preset === 'medium') {
-          // Up to 20 with borrowing
-          a = this.randomInt(11, 20);
-          b = this.randomInt(3, 9);
-          answer = a - b;
-          tier = 2;
-          tierName = 'Level 2 (Borrowing −)';
-          bonusSeconds = 2;
-          basePoints = 20;
-        } else {
-          // Hard: up to 100
-          const roll = Math.random();
-          if (roll < 0.5) {
-            a = this.randomInt(25, 55);
-            b = this.randomInt(9, a - 2);
-            answer = a - b;
+          // Subtraction with guaranteed non-negative answer (a >= b)
+          if (lvl === 1) {
+            a = this.randomInt(2, 8);
+            b = this.randomInt(1, a);
+            tier = 1;
+            tierName = 'Level 1 (Simple −)';
+            bonusSeconds = 1;
+            basePoints = 10;
+          } else if (lvl === 2) {
+            a = this.randomInt(9, 14);
+            b = this.randomInt(3, a);
+            tier = 2;
+            tierName = 'Level 2 (Borrowing −)';
+            bonusSeconds = 2;
+            basePoints = 20;
+          } else if (lvl === 3) {
+            a = this.randomInt(13, 22);
+            b = this.randomInt(5, a - 1);
             tier = 3;
-            tierName = 'Level 3 (2-Digit −)';
+            tierName = 'Level 3 (Teens −)';
             bonusSeconds = 3;
             basePoints = 35;
-          } else {
-            a = this.randomInt(50, 99);
-            b = this.randomInt(18, a - 5);
-            answer = a - b;
+          } else if (lvl === 4) {
+            a = this.randomInt(18, 30);
+            b = this.randomInt(8, a - 2);
             tier = 4;
-            tierName = 'Level 4 (Hard −)';
+            tierName = 'Level 4 (2-Digits −)';
             bonusSeconds = 4;
             basePoints = 50;
+          } else {
+            a = this.randomInt(25, 48);
+            b = this.randomInt(10, a - 3);
+            tier = 5;
+            tierName = `Level ${lvl} (Master −)`;
+            bonusSeconds = 5;
+            basePoints = 75;
           }
+          answer = a - b;
+        } else if (preset === 'medium') {
+          if (lvl === 1) {
+            a = this.randomInt(9, 16);
+            b = this.randomInt(2, a - 1);
+            tier = 1;
+            tierName = 'Level 1 (Intro −)';
+            bonusSeconds = 1;
+            basePoints = 15;
+          } else if (lvl === 2) {
+            a = this.randomInt(15, 26);
+            b = this.randomInt(6, a - 2);
+            tier = 2;
+            tierName = 'Level 2 (Borrowing −)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 3) {
+            a = this.randomInt(25, 45);
+            b = this.randomInt(12, a - 4);
+            tier = 3;
+            tierName = 'Level 3 (Double Digits −)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 4) {
+            a = this.randomInt(40, 75);
+            b = this.randomInt(18, a - 6);
+            tier = 4;
+            tierName = 'Level 4 (Tougher −)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else {
+            a = this.randomInt(60, 110);
+            b = this.randomInt(25, a - 8);
+            tier = 5;
+            tierName = `Level ${lvl} (Master −)`;
+            bonusSeconds = 5;
+            basePoints = 75;
+          }
+          answer = a - b;
+        } else {
+          // Hard or Custom
+          if (lvl === 1) {
+            a = this.randomInt(25, 50);
+            b = this.randomInt(8, a - 4);
+            tier = 2;
+            tierName = 'Level 1 (Subtraction)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 2) {
+            a = this.randomInt(40, 75);
+            b = this.randomInt(15, a - 5);
+            tier = 3;
+            tierName = 'Level 2 (Borrowing −)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 3) {
+            a = this.randomInt(65, 110);
+            b = this.randomInt(25, a - 8);
+            tier = 4;
+            tierName = 'Level 3 (Advanced −)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else if (lvl === 4) {
+            a = this.randomInt(90, 150);
+            b = this.randomInt(35, a - 10);
+            tier = 5;
+            tierName = 'Level 4 (Champion −)';
+            bonusSeconds = 5;
+            basePoints = 75;
+          } else {
+            a = this.randomInt(120, 220);
+            b = this.randomInt(45, a - 15);
+            tier = 5;
+            tierName = `Level ${lvl} (Mythic −)`;
+            bonusSeconds = 5;
+            basePoints = 90;
+          }
+          answer = a - b;
         }
       } else if (op === 'mul') {
         symbol = '×';
         if (preset === 'medium') {
-          // Multipliers 2, 3, 4, 5, 10
-          const friendlyFactors = [2, 3, 4, 5, 10];
-          a = friendlyFactors[Math.floor(Math.random() * friendlyFactors.length)];
-          b = this.randomInt(2, 9);
-          answer = a * b;
-          tier = 2;
-          tierName = 'Level 2 (Times Table)';
-          bonusSeconds = 2;
-          basePoints = 25;
-        } else {
-          // Hard: tables up to 12x12
-          const roll = Math.random();
-          if (roll < 0.6) {
-            a = this.randomInt(3, 9);
-            b = this.randomInt(4, 9);
-            answer = a * b;
+          if (lvl === 1) {
+            const factors = [2, 5, 10];
+            a = factors[Math.floor(Math.random() * factors.length)];
+            b = this.randomInt(2, 5);
+            tier = 1;
+            tierName = 'Level 1 (Easy ×)';
+            bonusSeconds = 1;
+            basePoints = 15;
+          } else if (lvl === 2) {
+            const factors = [2, 3, 4, 5, 10];
+            a = factors[Math.floor(Math.random() * factors.length)];
+            b = this.randomInt(2, 8);
+            tier = 2;
+            tierName = 'Level 2 (Tables 2-5)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 3) {
+            const factors = [3, 4, 6, 7];
+            a = factors[Math.floor(Math.random() * factors.length)];
+            b = this.randomInt(3, 8);
             tier = 3;
-            tierName = 'Level 3 (Multiplication)';
+            tierName = 'Level 3 (Tables 3-7)';
             bonusSeconds = 3;
-            basePoints = 35;
+            basePoints = 40;
+          } else if (lvl === 4) {
+            const factors = [6, 7, 8, 9];
+            a = factors[Math.floor(Math.random() * factors.length)];
+            b = this.randomInt(4, 9);
+            tier = 4;
+            tierName = 'Level 4 (Tables 6-9)';
+            bonusSeconds = 4;
+            basePoints = 55;
           } else {
+            a = this.randomInt(6, 10);
+            b = this.randomInt(6, 10);
+            tier = 5;
+            tierName = `Level ${lvl} (Master ×)`;
+            bonusSeconds = 5;
+            basePoints = 75;
+          }
+          answer = a * b;
+        } else {
+          // Hard or Custom
+          if (lvl === 1) {
+            a = this.randomInt(3, 8);
+            b = this.randomInt(3, 8);
+            tier = 2;
+            tierName = 'Level 1 (Multiplication)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 2) {
+            a = this.randomInt(4, 9);
+            b = this.randomInt(4, 9);
+            tier = 3;
+            tierName = 'Level 2 (Up to 9×9)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 3) {
+            a = this.randomInt(6, 11);
+            b = this.randomInt(5, 10);
+            tier = 4;
+            tierName = 'Level 3 (Tables to 11)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else if (lvl === 4) {
             a = this.randomInt(7, 12);
             b = this.randomInt(6, 12);
-            answer = a * b;
-            tier = 4;
-            tierName = 'Level 4 (Champion ×)';
+            tier = 5;
+            tierName = 'Level 4 (Full 12×12)';
             bonusSeconds = 5;
-            basePoints = 50;
+            basePoints = 75;
+          } else {
+            // Level 5+: 2-digit factors
+            a = this.randomInt(9, 15);
+            b = this.randomInt(6, 12);
+            tier = 5;
+            tierName = `Level ${lvl} (Mythic ×)`;
+            bonusSeconds = 5;
+            basePoints = 90;
           }
+          answer = a * b;
         }
       } else if (op === 'div') {
         symbol = '÷';
         // Exact integer division with NO remainders!
-        // Generate divisor (b) and quotient (answer), then dividend a = b * answer
+        // b = divisor, answer = quotient, dividend a = b * answer
         if (preset === 'medium') {
-          b = this.randomInt(2, 5);
-          answer = this.randomInt(2, 10);
-          a = b * answer;
-          tier = 2;
-          tierName = 'Level 2 (Even ÷)';
-          bonusSeconds = 2;
-          basePoints = 25;
-        } else {
-          const roll = Math.random();
-          if (roll < 0.6) {
-            b = this.randomInt(3, 9);
-            answer = this.randomInt(2, 10);
-            a = b * answer;
+          if (lvl === 1) {
+            const divisors = [2, 5, 10];
+            b = divisors[Math.floor(Math.random() * divisors.length)];
+            answer = this.randomInt(2, 5);
+            tier = 1;
+            tierName = 'Level 1 (Easy ÷)';
+            bonusSeconds = 1;
+            basePoints = 15;
+          } else if (lvl === 2) {
+            b = this.randomInt(2, 5);
+            answer = this.randomInt(2, 8);
+            tier = 2;
+            tierName = 'Level 2 (Divisors 2-5)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 3) {
+            b = this.randomInt(3, 7);
+            answer = this.randomInt(3, 8);
             tier = 3;
-            tierName = 'Level 3 (Division)';
+            tierName = 'Level 3 (Divisors 3-7)';
             bonusSeconds = 3;
-            basePoints = 35;
-          } else {
-            b = this.randomInt(6, 12);
-            answer = this.randomInt(5, 12);
-            a = b * answer;
+            basePoints = 40;
+          } else if (lvl === 4) {
+            b = this.randomInt(4, 8);
+            answer = this.randomInt(4, 9);
             tier = 4;
-            tierName = 'Level 4 (Champion ÷)';
+            tierName = 'Level 4 (Divisors 4-8)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else {
+            b = this.randomInt(6, 9);
+            answer = this.randomInt(5, 10);
+            tier = 5;
+            tierName = `Level ${lvl} (Master ÷)`;
             bonusSeconds = 5;
-            basePoints = 50;
+            basePoints = 75;
           }
+          a = b * answer;
+        } else {
+          // Hard or Custom
+          if (lvl === 1) {
+            b = this.randomInt(3, 8);
+            answer = this.randomInt(3, 8);
+            tier = 2;
+            tierName = 'Level 1 (Division)';
+            bonusSeconds = 2;
+            basePoints = 25;
+          } else if (lvl === 2) {
+            b = this.randomInt(4, 9);
+            answer = this.randomInt(4, 9);
+            tier = 3;
+            tierName = 'Level 2 (Medium ÷)';
+            bonusSeconds = 3;
+            basePoints = 40;
+          } else if (lvl === 3) {
+            b = this.randomInt(5, 11);
+            answer = this.randomInt(5, 10);
+            tier = 4;
+            tierName = 'Level 3 (Advanced ÷)';
+            bonusSeconds = 4;
+            basePoints = 55;
+          } else if (lvl === 4) {
+            b = this.randomInt(6, 12);
+            answer = this.randomInt(6, 12);
+            tier = 5;
+            tierName = 'Level 4 (Tables to 12 ÷)';
+            bonusSeconds = 5;
+            basePoints = 75;
+          } else {
+            b = this.randomInt(7, 14);
+            answer = this.randomInt(6, 13);
+            tier = 5;
+            tierName = `Level ${lvl} (Mythic ÷)`;
+            bonusSeconds = 5;
+            basePoints = 90;
+          }
+          a = b * answer;
         }
       }
 
@@ -686,8 +991,96 @@
   };
 
   /* ==========================================================================
-     7. GAME CONTROLLER & TIMER
+     7. GAME CONTROLLER, LEVEL PROGRESSION & TIMER
      ========================================================================== */
+  function getLevelThreshold(level) {
+    const thresholds = [0, 100, 250, 450, 700, 1000, 1400, 1900];
+    if (level < thresholds.length) return thresholds[level];
+    return 1900 + (level - 7) * 600;
+  }
+
+  function getPrevLevelThreshold(level) {
+    if (level <= 1) return 0;
+    return getLevelThreshold(level - 1);
+  }
+
+  function updateLevelHUD() {
+    const lvl = state.playerLevel;
+    if (elements.hudLevel) {
+      elements.hudLevel.textContent = `${lvl} ⭐`;
+    }
+    const prevThresh = getPrevLevelThreshold(lvl);
+    const nextThresh = getLevelThreshold(lvl);
+    const range = Math.max(1, nextThresh - prevThresh);
+    const currentInLevel = Math.max(0, state.score - prevThresh);
+    const pct = Math.min(100, Math.max(0, Math.round((currentInLevel / range) * 100)));
+    if (elements.levelBarFill) {
+      elements.levelBarFill.style.width = `${pct}%`;
+    }
+  }
+
+  function triggerLevelUp(newLevel) {
+    const titleIdx = Math.min(newLevel, state.levelTitles.length - 1);
+    const title = state.levelTitles[titleIdx];
+
+    // Grant Level-up Time Bonus (+5s!)
+    addBonusTime(5);
+
+    // Play level up sound & confetti
+    SoundFX.playLevelUp();
+    triggerConfetti();
+
+    // Display Level Up Banner
+    if (elements.levelUpBanner) {
+      if (elements.levelUpTitle) {
+        elements.levelUpTitle.textContent = `LEVEL ${newLevel}: ${title.toUpperCase()}!`;
+      }
+      if (elements.levelUpDesc) {
+        elements.levelUpDesc.textContent = `+5s Bonus Time! Math challenges upgraded! 🚀`;
+      }
+      if (elements.levelUpBadge) {
+        elements.levelUpBadge.textContent = `+5s ⏱️`;
+      }
+
+      elements.levelUpBanner.classList.remove('hidden', 'fade-out');
+
+      if (state.levelUpTimeoutId) clearTimeout(state.levelUpTimeoutId);
+      state.levelUpTimeoutId = setTimeout(() => {
+        elements.levelUpBanner.classList.add('fade-out');
+        setTimeout(() => {
+          elements.levelUpBanner.classList.add('hidden');
+          elements.levelUpBanner.classList.remove('fade-out');
+        }, 400);
+      }, 2600);
+    }
+  }
+
+  function triggerStreakMilestone(streak, milestoneData) {
+    // Play celebratory sound & confetti
+    SoundFX.playStreakMilestone(streak);
+    triggerConfetti();
+
+    // Display Streak Achievement Banner
+    if (elements.streakAchievementBanner) {
+      if (elements.streakAchievementIcon) elements.streakAchievementIcon.textContent = milestoneData.icon;
+      if (elements.streakAchievementKicker) elements.streakAchievementKicker.textContent = milestoneData.kicker;
+      if (elements.streakAchievementTitle) elements.streakAchievementTitle.textContent = milestoneData.title;
+      if (elements.streakAchievementDesc) elements.streakAchievementDesc.textContent = milestoneData.desc;
+      if (elements.streakAchievementBonus) elements.streakAchievementBonus.textContent = `+${milestoneData.bonus} PTS`;
+
+      elements.streakAchievementBanner.classList.remove('hidden', 'fade-out');
+
+      if (state.streakMilestoneTimeoutId) clearTimeout(state.streakMilestoneTimeoutId);
+      state.streakMilestoneTimeoutId = setTimeout(() => {
+        elements.streakAchievementBanner.classList.add('fade-out');
+        setTimeout(() => {
+          elements.streakAchievementBanner.classList.add('hidden');
+          elements.streakAchievementBanner.classList.remove('fade-out');
+        }, 400);
+      }, 2600);
+    }
+  }
+
   function switchScreen(screenElement) {
     [elements.screenConfig, elements.screenGame, elements.screenSummary].forEach(screen => {
       screen.classList.remove('active');
@@ -703,9 +1096,12 @@
     // Reset game state
     state.isPlaying = true;
     state.isPaused = false;
+    state.isSubmitting = false; // Debounce lock reset
     state.score = 0;
     state.streak = 0;
     state.bestStreak = 0;
+    state.playerLevel = 1;
+    state.highestLevelReached = 1;
     state.correctCount = 0;
     state.missedCount = 0;
     state.totalAnswered = 0;
@@ -720,7 +1116,12 @@
     elements.hudScore.textContent = '0';
     elements.hudStreak.textContent = '0 🔥';
     elements.hudMultiplier.textContent = '1x';
+    updateLevelHUD();
     updateTimerHUD();
+
+    // Reset banners
+    if (elements.levelUpBanner) elements.levelUpBanner.classList.add('hidden');
+    if (elements.streakAchievementBanner) elements.streakAchievementBanner.classList.add('hidden');
 
     // Audio context initialization
     SoundFX.getAudioContext();
@@ -788,6 +1189,7 @@
   }
 
   function nextQuestion() {
+    state.isSubmitting = false; // Release submission lock for the new question
     state.questionNumber++;
     state.currentQuestion = MathEngine.generateQuestion();
     state.currentInput = '';
@@ -810,7 +1212,7 @@
   }
 
   function appendDigit(digit) {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || state.isSubmitting) return;
     if (state.currentInput.length >= 4) return; // Cap at 4 digits for kid sanity
     state.currentInput += digit;
     elements.answerText.textContent = state.currentInput;
@@ -818,21 +1220,22 @@
   }
 
   function backspaceDigit() {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || state.isSubmitting) return;
     state.currentInput = state.currentInput.slice(0, -1);
     elements.answerText.textContent = state.currentInput;
     SoundFX.playTap();
   }
 
   function clearInput() {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || state.isSubmitting) return;
     state.currentInput = '';
     elements.answerText.textContent = '';
     SoundFX.playTap();
   }
 
   function submitAnswer() {
-    if (!state.isPlaying) return;
+    // Debounce & Lock: ignore rapid Enter keystrokes or double clicks on the same question
+    if (!state.isPlaying || state.isSubmitting) return;
 
     if (!state.currentInput || state.currentInput.trim() === '') {
       // Empty input wiggle
@@ -843,6 +1246,9 @@
       elements.feedbackMsg.textContent = 'Please enter an answer first!';
       return;
     }
+
+    // Lock submission immediately to prevent duplicate scoring!
+    state.isSubmitting = true;
 
     const userAnswer = parseInt(state.currentInput, 10);
     const expected = state.currentQuestion.answer;
@@ -856,9 +1262,12 @@
         state.bestStreak = state.streak;
       }
 
-      // Calculate Streak Multiplier
+      // Calculate Streak Multiplier (scaled extra high for long streaks)
       let multiplier = 1.0;
-      if (state.streak >= 10) multiplier = 2.0;
+      if (state.streak >= 100) multiplier = 4.0;
+      else if (state.streak >= 50) multiplier = 3.0;
+      else if (state.streak >= 20) multiplier = 2.5;
+      else if (state.streak >= 10) multiplier = 2.0;
       else if (state.streak >= 5) multiplier = 1.5;
       else if (state.streak >= 3) multiplier = 1.25;
 
@@ -881,9 +1290,34 @@
 
       // Play Sound
       SoundFX.playCorrect(state.currentQuestion.tier);
-      if (state.streak % 5 === 0) {
+
+      // Check Streak Milestones: 5, 10, 20, 50, 100
+      const STREAK_MILESTONES = {
+        5: { bonus: 25, title: '5 IN A ROW!', kicker: '🔥 SUPER STREAK!', desc: '+25 Streak Bonus Points! You are on fire!', icon: '🔥' },
+        10: { bonus: 50, title: '10 IN A ROW!', kicker: '⚡ UNSTOPPABLE!', desc: '+50 Streak Bonus Points! 2x Multiplier Active!', icon: '⚡' },
+        20: { bonus: 100, title: '20 IN A ROW!', kicker: '🌟 MATH MASTER!', desc: '+100 Streak Bonus Points! Pure mathematical brilliance!', icon: '🌟' },
+        50: { bonus: 250, title: '50 IN A ROW!', kicker: '🚀 LEGENDARY HERO!', desc: '+250 Streak Bonus Points! True Math Champion!', icon: '🚀' },
+        100: { bonus: 500, title: '100 IN A ROW!', kicker: '👑 MYTHIC GODLIKE!', desc: '+500 Streak Bonus Points! Unbelievable Mastery!', icon: '👑' }
+      };
+
+      if (STREAK_MILESTONES[state.streak]) {
+        const ms = STREAK_MILESTONES[state.streak];
+        state.score += ms.bonus;
+        elements.hudScore.textContent = String(state.score);
+        triggerStreakMilestone(state.streak, ms);
+      } else if (state.streak % 5 === 0 && state.streak > 5) {
         setTimeout(() => SoundFX.playStreak(), 200);
       }
+
+      // Check Level Up progression!
+      while (state.score >= getLevelThreshold(state.playerLevel)) {
+        state.playerLevel++;
+        if (state.playerLevel > state.highestLevelReached) {
+          state.highestLevelReached = state.playerLevel;
+        }
+        triggerLevelUp(state.playerLevel);
+      }
+      updateLevelHUD();
 
       // Visual feedback
       elements.userAnswerBox.className = 'user-answer-box correct';
@@ -925,7 +1359,8 @@
   }
 
   function skipQuestion() {
-    if (!state.isPlaying) return;
+    if (!state.isPlaying || state.isSubmitting) return;
+    state.isSubmitting = true;
 
     state.totalAnswered++;
     state.missedCount++;
@@ -950,6 +1385,7 @@
   function endGame() {
     if (!state.isPlaying) return;
     state.isPlaying = false;
+    state.isSubmitting = false;
     clearInterval(state.timerIntervalId);
     state.timerIntervalId = null;
 
@@ -984,6 +1420,7 @@
       timestamp: now.getTime(),
       preset: state.preset,
       score: state.score,
+      maxLevel: state.highestLevelReached,
       total,
       correct,
       missed,
@@ -998,6 +1435,10 @@
 
     // Populate Summary Screen
     elements.summaryScore.textContent = String(state.score);
+    if (elements.summaryLevel) {
+      const lvlTitle = state.levelTitles[Math.min(state.highestLevelReached, state.levelTitles.length - 1)];
+      elements.summaryLevel.textContent = `Lvl ${state.highestLevelReached} (${lvlTitle})`;
+    }
     elements.summaryAccuracy.textContent = `${accuracy}%`;
     elements.summaryCorrect.textContent = String(correct);
     elements.summaryMissed.textContent = String(missed);
@@ -1379,17 +1820,19 @@
     if (totalGames === 0) {
       elements.historyTbody.innerHTML = `
         <tr>
-          <td colspan="6" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
+          <td colspan="7" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
         </tr>
       `;
     } else {
       const reversed = history.slice().reverse();
       elements.historyTbody.innerHTML = reversed.map(game => {
         const accColor = game.accuracy >= 90 ? '#10b981' : game.accuracy >= 70 ? '#f59e0b' : '#ef4444';
+        const lvl = game.maxLevel || 1;
         return `
           <tr>
             <td><strong>${game.date}</strong></td>
             <td><span class="preset-badge" style="position:static; display:inline-block;">${game.preset}</span></td>
+            <td><span style="color:#9333ea; font-weight:700;">Level ${lvl} ⭐</span></td>
             <td><strong>${game.score} pts</strong></td>
             <td><span style="color:${accColor}; font-weight:700;">${game.accuracy}%</span></td>
             <td>${game.correct}/${game.total}</td>

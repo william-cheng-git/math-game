@@ -19,21 +19,37 @@ A complete, self-contained, kid-friendly web game for practicing simple arithmet
 - **Operations Toggles:** Fast toggle checkboxes for Addition (`+`), Subtraction (`−`), Multiplication (`×`), and Division (`÷`).
 - **Flexible Round Timers:** Quick chips for 30s (Sprint), 60s (Standard), 90s (Endurance), 120s (Marathon), or custom seconds.
 
-### 2. ⏱️ Urgency Countdown Clock & Bonus Seconds System
+### 2. ⭐ Dynamic Level Progression & Adaptive Difficulty
+- **Real-Time Leveling Up:** As players score points, their level rises from **Level 1 (Apprentice)** up through **Explorer, Adventurer, Champion, Master, and Legend**.
+- **Level-Up Celebrations:** Crossing level thresholds triggers a golden animated level-up banner, celebratory fanfare, confetti bursts, and awards **+5s extra bonus time** on the clock.
+- **Adaptive Difficulty:** Math questions dynamically scale with the player's level—introducing carrying/borrowing, higher times tables, and larger numbers as kids improve.
+- **Max Level Saved:** Tracks and celebrates the highest level reached on the round summary and in session history.
+
+### 3. 🔥 Long Streak Bonuses & Milestone Celebrations (5, 10, 20, 50, 100)
+- **High-Streak Multipliers:** Consecutive correct answers award climbing score multipliers (up to 4.0x for 100+ streak).
+- **Streak Achievement Milestones:**
+  - **🔥 5 In A Row (Super Streak):** +25 bonus points & animated celebratory banner.
+  - **⚡ 10 In A Row (Unstoppable):** +50 bonus points & 2.0x multiplier.
+  - **🌟 20 In A Row (Math Master):** +100 bonus points & starburst fanfare.
+  - **🚀 50 In A Row (Legendary Hero):** +250 bonus points & grand confetti explosion.
+  - **👑 100 In A Row (Mythic Godlike):** +500 bonus points & triumphant fanfare.
+
+### 4. ⏱️ Urgency Countdown Clock & Bonus Seconds System
 - **Countdown Clock with Visual Urgency Cues:**
   - Standard soothing theme when time $> 15\text{s}$.
   - Warning amber state when time $\le 15\text{s}$.
   - Urgent pulsating red animation with subtle audio cues when time $\le 5\text{s}$.
 - **Bonus Time for Harder Questions:**
-  - Questions are dynamically classified into 4 difficulty tiers based on operations, number sizes, and regrouping/carrying/borrowing.
+  - Questions are dynamically classified into 5 difficulty tiers based on operations, level, number sizes, and regrouping.
   - Correct answers reward **bonus seconds** (`+1s` up to `+5s`) and bonus points, encouraging careful problem-solving rather than reckless guessing.
   - Floating visual notification badges (`+3s! ⏱️`, `+35 pts!`) animate in real-time.
 
-### 3. 👶 Kid-Friendly Arithmetic UX
+### 5. 👶 Kid-Friendly Arithmetic UX & Anti-Spam Protection
+- **Debounced Input & Rapid-Enter Protection:** Completely prevents accidental double-scoring or repeated submissions when hitting Enter quickly.
 - **Chunky On-Screen Keypad:** Large touch targets designed specifically for tablets and mobile touchscreens (`1`–`9`, `0`, `Clear`, `⌫ Backspace`, `⏭️ Skip`, `GO!`).
 - **Full Physical Keyboard Support:** Desktop users can type numbers `0`–`9`, `Backspace`, `Enter` to submit, `C` to clear, and `S` to skip.
 - **Positive, Non-Punitive Feedback:** Cheerful visual badges, encouraging messages ("Awesome!", "Nice try! Keep going!"), and gentle animations that motivate kids without harsh punishment.
-- **Built-in Web Audio API Synthesizer:** Real-time musical arpeggios, tap clicks, power-up chimes, and victory fanfares generated via browser audio synthesis—**zero external audio asset files to load, zero 404/CORS issues, and 100% offline-ready** (includes persistent mute toggle).
+- **Built-in Web Audio API Synthesizer:** Real-time musical arpeggios, tap clicks, power-up chimes, level-up fanfares, and victory melodies generated via browser audio synthesis—**zero external audio asset files to load, zero 404/CORS issues, and 100% offline-ready** (includes persistent mute toggle).
 
 ### 4. 🍪 Cookie Persistence & LocalStorage Fallback
 - Persists all past game records (timestamp, preset, score, accuracy %, correct/missed counts, duration, and bonus time earned) and personal bests in **browser cookies** (`SameSite=Lax`, 365-day persistence).

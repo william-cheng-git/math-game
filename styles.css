@@ -778,16 +778,26 @@ body {
    ========================================================================== */
 .game-hud {
   display: grid;
-  grid-template-columns: 1fr 1.3fr 1fr auto;
-  gap: 12px;
+  grid-template-columns: 1fr 1fr 1.25fr 1fr auto;
+  gap: 10px;
   align-items: stretch;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   .game-hud {
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto auto;
+    grid-template-rows: auto auto auto;
+  }
+}
+
+@media (max-width: 440px) {
+  .game-hud {
+    grid-template-columns: 1fr 1fr;
+  }
+  .btn-hud-action {
+    grid-column: span 2;
+    height: 38px;
   }
 }
 
@@ -802,6 +812,33 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: var(--shadow-sm);
+}
+
+/* Level Card */
+.level-card {
+  border-color: #c084fc;
+  background: #faf5ff;
+}
+
+.level-card .hud-value {
+  color: #9333ea;
+}
+
+.level-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #f3e8ff;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.level-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #c084fc, #9333ea);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
 }
 
 .hud-label {
@@ -997,6 +1034,131 @@ body {
   background: #fee2e2;
   border-color: #f87171;
   color: #ef4444;
+}
+
+/* Achievement & Level-Up Animated Banners */
+.achievement-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 18px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.15);
+  margin-bottom: 14px;
+  animation: achievementEntrance 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  position: relative;
+  overflow: hidden;
+}
+
+.achievement-banner.fade-out {
+  animation: achievementExit 0.4s ease-in forwards;
+}
+
+@keyframes achievementEntrance {
+  0% { transform: translateY(-16px) scale(0.88); opacity: 0; }
+  60% { transform: translateY(3px) scale(1.02); opacity: 1; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+@keyframes achievementExit {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-12px) scale(0.92); opacity: 0; }
+}
+
+/* Level Up Banner Styles */
+.level-up-banner {
+  background: linear-gradient(135deg, #fdf4ff, #fae8ff 50%, #f3e8ff);
+  border: 3px solid #c084fc;
+  box-shadow: 0 8px 24px -2px rgba(168, 85, 247, 0.35);
+}
+
+.level-up-banner::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255, 255, 255, 0.8) 50%, transparent 60%);
+  animation: shineSweep 2.2s infinite;
+  pointer-events: none;
+}
+
+@keyframes shineSweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Streak Milestone Banner Styles */
+.streak-achievement-banner {
+  background: linear-gradient(135deg, #fffbeb, #fef3c7 50%, #fed7aa);
+  border: 3px solid #f59e0b;
+  box-shadow: 0 8px 24px -2px rgba(245, 158, 11, 0.4);
+}
+
+.achievement-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.achievement-anim-icon {
+  font-size: 2.2rem;
+  animation: iconPop 1.2s infinite ease-in-out;
+}
+
+@keyframes iconPop {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  50% { transform: scale(1.2) rotate(10deg); }
+}
+
+.achievement-text-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.achievement-kicker {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9333ea;
+}
+
+.streak-achievement-banner .achievement-kicker {
+  color: #c2410c;
+}
+
+.achievement-main-title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.15;
+  color: var(--text-main);
+}
+
+.achievement-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.achievement-badge-pill {
+  background: #9333ea;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 0 #6b21a8;
+  white-space: nowrap;
+}
+
+.streak-bonus-pill {
+  background: #ea580c;
+  box-shadow: 0 4px 0 #9a3412;
 }
 
 /* Main Gameplay Card */
@@ -1447,6 +1609,10 @@ body {
 
 .metric-score .metric-value {
   color: var(--color-primary);
+}
+
+.metric-level .metric-value {
+  color: #9333ea;
 }
 
 .metric-accuracy .metric-value {
