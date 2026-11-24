@@ -34,11 +34,66 @@
     { text: 'No worries! You got the next one! ✨', mascot: '🎯' }
   ];
 
+  // Stage Adventure mode configurations (6 stages of ascending constant difficulty)
+  const STAGE_DEFINITIONS = [
+    {
+      stage: 1,
+      name: 'Starter Grove',
+      icon: '🌱',
+      desc: 'Single-digit + & − (Basic)',
+      ops: ['add', 'sub']
+    },
+    {
+      stage: 2,
+      name: 'Carrying Crossing',
+      icon: '⚡',
+      desc: 'Carrying, borrowing, 2×, 5×, 10×',
+      ops: ['add', 'sub', 'mul']
+    },
+    {
+      stage: 3,
+      name: 'Digit Mountain',
+      icon: '🚀',
+      desc: 'Double-digits, 3×-7×, simple ÷',
+      ops: ['add', 'sub', 'mul', 'div']
+    },
+    {
+      stage: 4,
+      name: 'Champion Fortress',
+      icon: '🏆',
+      desc: 'Multiplication to 12, division to 144',
+      ops: ['add', 'sub', 'mul', 'div']
+    },
+    {
+      stage: 5,
+      name: 'Wizard Peak',
+      icon: '💎',
+      desc: 'Advanced mental arithmetic',
+      ops: ['add', 'sub', 'mul', 'div']
+    },
+    {
+      stage: 6,
+      name: 'Mythic Realm',
+      icon: '👑',
+      desc: 'Grandmaster arithmetic mastery',
+      ops: ['add', 'sub', 'mul', 'div']
+    }
+  ];
+
   /* ==========================================================================
      2. APP STATE
      ========================================================================== */
   const state = {
     // Current setup
+    gameMode: 'stageAdventure', // 'stageAdventure', 'timeRush', or 'levelQuest'
+    currentStage: 1,
+    stageQuestionsTotal: 10,
+    stageQuestionIndex: 0,
+    currentLevel: 1,
+    levelQuestionsTotal: 20,
+    levelQuestionIndex: 0,
+    levelCorrectCount: 0,
+    levelMissedCount: 0,
     preset: 'easy', // 'easy', 'medium', 'hard', 'custom'
     operations: ['add', 'sub'], // 'add', 'sub', 'mul', 'div'
     startingTime: 60,
@@ -87,6 +142,18 @@
     saveData: {
       highScores: { easy: 0, medium: 0, hard: 0, custom: 0 },
       bestAccuracy: { easy: 0, medium: 0, hard: 0, custom: 0 },
+      stageProgress: {
+        unlockedStage: 1,
+        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+      },
+      levelProgress: {
+        unlockedLevel: 1,
+        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      },
       history: []
     },
 
@@ -101,6 +168,7 @@
      ========================================================================== */
   const elements = {
     // Screens
+    screenLanding: document.getElementById('screen-landing'),
     screenConfig: document.getElementById('screen-config'),
     screenGame: document.getElementById('screen-game'),
     screenSummary: document.getElementById('screen-summary'),
@@ -113,6 +181,21 @@
     btnSoundToggle: document.getElementById('btn-sound-toggle'),
     soundIcon: document.getElementById('sound-icon'),
     btnOpenHistory: document.getElementById('btn-open-history'),
+
+    // Mode Selection & Stage Panels
+    modeBtnStage: document.getElementById('mode-btn-stage'),
+    modeBtnTime: document.getElementById('mode-btn-time'),
+    modeBtnLevelQuest: document.getElementById('mode-btn-level-quest'),
+    panelStageAdventure: document.getElementById('panel-stage-adventure'),
+    panelTimeRush: document.getElementById('panel-time-rush'),
+    panelLevelQuest: document.getElementById('panel-level-quest'),
+    stageCards: document.querySelectorAll('.stage-grid .stage-card'),
+    levelCards: document.querySelectorAll('.level-grid .level-card'),
+
+    // Landing Page
+    gameCards: document.querySelectorAll('.landing-games-grid .game-card'),
+    btnPlaySelectedGame: document.getElementById('btn-play-selected-game'),
+    selectedGame: 'math-blast',
 
     // Config Screen
     presetCards: document.querySelectorAll('.preset-card'),
@@ -130,9 +213,16 @@
     bestAccVal: document.getElementById('best-acc-val'),
     btnStartGame: document.getElementById('btn-start-game'),
 
-    // Gameplay Screen
+    // Gameplay Screen HUD
+    hudLevelCard: document.getElementById('hud-level-card'),
     hudLevel: document.getElementById('hud-level'),
     levelBarFill: document.getElementById('level-bar-fill'),
+    hudStageCard: document.getElementById('hud-stage-card'),
+    hudStageNum: document.getElementById('hud-stage-num'),
+    hudStageName: document.getElementById('hud-stage-name'),
+    hudStageProgressCard: document.getElementById('hud-stage-progress-card'),
+    hudStageProgress: document.getElementById('hud-stage-progress'),
+    stageProgressFill: document.getElementById('stage-progress-fill'),
     hudScore: document.getElementById('hud-score'),
     scorePopup: document.getElementById('score-popup'),
     hudTimer: document.getElementById('hud-timer'),
@@ -142,6 +232,25 @@
     hudStreak: document.getElementById('hud-streak'),
     hudMultiplier: document.getElementById('hud-multiplier'),
     btnQuitGame: document.getElementById('btn-quit-game'),
+
+    // Level Quest HUD (untimed mode)
+    hudLevelCardLQ: document.getElementById('hud-level-card'),
+
+    // Level Quest Result Overlay
+    levelResultOverlay: document.getElementById('level-result-overlay'),
+    levelResultMascot: document.getElementById('level-result-mascot'),
+    levelResultTitle: document.getElementById('level-result-title'),
+    levelResultAccuracy: document.getElementById('level-result-accuracy'),
+    levelResultCorrect: document.getElementById('level-result-correct'),
+    levelResultLevel: document.getElementById('level-result-level'),
+    levelResultMessage: document.getElementById('level-result-message'),
+    levelResultChartCanvas: document.getElementById('levelResultChart'),
+    levelResultSvgFallback: document.getElementById('level-result-svg-fallback'),
+    btnLevelNext: document.getElementById('btn-level-next'),
+    btnLevelNextText: document.getElementById('btn-level-next-text'),
+    btnLevelRetry: document.getElementById('btn-level-retry'),
+    btnLevelRetryText: document.getElementById('btn-level-retry-text'),
+    btnLevelQuit: document.getElementById('btn-level-quit'),
 
     // Achievement Banners
     levelUpBanner: document.getElementById('level-up-banner'),
@@ -174,6 +283,11 @@
 
     // Summary Screen
     highScoreBanner: document.getElementById('high-score-banner'),
+    stageResultBanner: document.getElementById('stage-result-banner'),
+    stageResultIcon: document.getElementById('stage-result-icon'),
+    stageResultTitle: document.getElementById('stage-result-title'),
+    stageResultSub: document.getElementById('stage-result-sub'),
+    stageStarsDisplay: document.getElementById('stage-stars-display'),
     summaryMascot: document.getElementById('summary-mascot'),
     summaryTitle: document.getElementById('summary-heading'),
     summaryCompliment: document.getElementById('summary-compliment'),
@@ -188,8 +302,12 @@
     accuracySvgFallback: document.getElementById('accuracy-svg-fallback'),
     legendCorrectPct: document.getElementById('legend-correct-pct'),
     legendMissedPct: document.getElementById('legend-missed-pct'),
+    btnNextStage: document.getElementById('btn-next-stage'),
+    btnNextStageText: document.getElementById('btn-next-stage-text'),
     btnPlayAgain: document.getElementById('btn-play-again'),
+    btnPlayAgainText: document.getElementById('btn-play-again-text'),
     btnChangeSettings: document.getElementById('btn-change-settings'),
+    btnChangeSettingsText: document.getElementById('btn-change-settings-text'),
     btnSummaryHistory: document.getElementById('btn-summary-history'),
 
     // History Modal
@@ -317,16 +435,31 @@
       }
 
       // If data exists, merge into state
+      const defaultStageProgress = {
+        unlockedStage: 1,
+        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+      };
+
       if (rawData && typeof rawData === 'object') {
+        const rawStage = (rawData.stageProgress && typeof rawData.stageProgress === 'object') ? rawData.stageProgress : {};
         state.saveData = {
           highScores: Object.assign({ easy: 0, medium: 0, hard: 0, custom: 0 }, rawData.highScores),
           bestAccuracy: Object.assign({ easy: 0, medium: 0, hard: 0, custom: 0 }, rawData.bestAccuracy),
+          stageProgress: {
+            unlockedStage: Math.max(1, parseInt(rawStage.unlockedStage, 10) || 1),
+            stars: Object.assign({}, defaultStageProgress.stars, rawStage.stars),
+            bestAccuracy: Object.assign({}, defaultStageProgress.bestAccuracy, rawStage.bestAccuracy),
+            bestScore: Object.assign({}, defaultStageProgress.bestScore, rawStage.bestScore)
+          },
           history: Array.isArray(rawData.history) ? rawData.history : []
         };
       }
 
       this.updateStorageStatusUI(loadedFrom);
       this.updateBestRecordUI();
+      renderStageGridUI();
     },
 
     saveData() {
@@ -343,6 +476,7 @@
       const cookieData = {
         highScores: state.saveData.highScores,
         bestAccuracy: state.saveData.bestAccuracy,
+        stageProgress: state.saveData.stageProgress,
         history: state.saveData.history.slice(-MAX_COOKIE_HISTORY)
       };
       const cookieJson = JSON.stringify(cookieData);
@@ -350,6 +484,7 @@
 
       this.updateStorageStatusUI(cookieSuccess ? 'cookies & localStorage' : 'localStorage fallback');
       this.updateBestRecordUI();
+      renderStageGridUI();
     },
 
     clearAll() {
@@ -361,11 +496,18 @@
       state.saveData = {
         highScores: { easy: 0, medium: 0, hard: 0, custom: 0 },
         bestAccuracy: { easy: 0, medium: 0, hard: 0, custom: 0 },
+        stageProgress: {
+          unlockedStage: 1,
+          stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+          bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+          bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
+        },
         history: []
       };
 
       this.updateStorageStatusUI('cleared');
       this.updateBestRecordUI();
+      renderStageGridUI();
       renderHistoryModal();
     },
 
@@ -396,6 +538,52 @@
       if (elements.bestAccVal) elements.bestAccVal.textContent = `${bestAcc}%`;
     }
   };
+
+  /* ==========================================================================
+     4b. STAGE GRID UI CONTROLLER
+     ========================================================================== */
+  function renderStageGridUI() {
+    const unlocked = (state.saveData && state.saveData.stageProgress && state.saveData.stageProgress.unlockedStage) || 1;
+    const stageStars = (state.saveData && state.saveData.stageProgress && state.saveData.stageProgress.stars) || {};
+
+    if (!elements.stageCards || elements.stageCards.length === 0) return;
+
+    elements.stageCards.forEach(card => {
+      const stageNum = parseInt(card.dataset.stage, 10);
+      const starsEl = document.getElementById(`stage-stars-${stageNum}`);
+      const isUnlocked = stageNum <= unlocked;
+      const isActive = stageNum === state.currentStage;
+
+      card.classList.toggle('locked', !isUnlocked);
+      card.classList.toggle('active', isActive && isUnlocked);
+      card.setAttribute('aria-checked', String(isActive && isUnlocked));
+      card.setAttribute('aria-disabled', String(!isUnlocked));
+
+      if (starsEl) {
+        if (!isUnlocked) {
+          starsEl.textContent = '🔒 Locked';
+        } else {
+          const starsCount = stageStars[stageNum] || 0;
+          if (starsCount === 3) starsEl.textContent = '⭐⭐⭐';
+          else if (starsCount === 2) starsEl.textContent = '⭐⭐☆';
+          else if (starsCount === 1) starsEl.textContent = '⭐☆☆';
+          else starsEl.textContent = '☆☆☆';
+        }
+      }
+    });
+
+    // Update start button label when in stage adventure mode
+    if (elements.btnStartGame) {
+      const startCaption = elements.btnStartGame.querySelector('.btn-caption');
+      if (startCaption) {
+        if (state.gameMode === 'stageAdventure') {
+          startCaption.textContent = `START STAGE ${state.currentStage} 🚀`;
+        } else {
+          startCaption.textContent = 'START GAME';
+        }
+      }
+    }
+  }
 
   /* ==========================================================================
      5. SOUND SYNTHESIS ENGINE (Web Audio API)
@@ -536,6 +724,26 @@
       if (!state.soundEnabled) return;
       this.playTone(659.25, 'triangle', 0.2, 0.2, 0);
       this.playTone(523.25, 'triangle', 0.4, 0.25, 0.15);
+    },
+
+    playFailure() {
+      if (!state.soundEnabled) return;
+      // Sad descending wobble - gentle, not harsh
+      this.playTone(349.23, 'sine', 0.3, 0.2, 0);  // F4
+      this.playTone(329.63, 'sine', 0.3, 0.18, 0.15); // E4
+      this.playTone(293.66, 'sine', 0.5, 0.16, 0.3);  // D4
+    },
+
+    playCongrats() {
+      if (!state.soundEnabled) return;
+      // Triumphant arpeggio: C5 E5 G5 C6 E6 G6
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+      notes.forEach((freq, idx) => {
+        this.playTone(freq, 'triangle', 0.24, 0.26, idx * 0.07);
+      });
+      setTimeout(() => {
+        this.playTone(2093.00, 'sine', 0.5, 0.22, 0); // C7 shimmer
+      }, 450);
     }
   };
 
@@ -545,6 +753,148 @@
   const MathEngine = {
     randomInt(min, max) {
       return Math.floor(Math.random() * (max - min + 1)) + min;
+    },
+
+    /**
+     * Generates questions for Stage Adventure mode.
+     * Within the same stage, the difficulty is ALWAYS constant!
+     */
+    generateStageQuestion(stageNum) {
+      const stageDef = STAGE_DEFINITIONS.find(d => d.stage === stageNum) || STAGE_DEFINITIONS[0];
+
+      // Available operations: default stage operations
+      let availableOps = stageDef.ops.slice();
+      if (state.operations && state.operations.length > 0) {
+        const intersection = stageDef.ops.filter(op => state.operations.includes(op));
+        if (intersection.length > 0) {
+          availableOps = intersection;
+        }
+      }
+      const op = availableOps[Math.floor(Math.random() * availableOps.length)];
+
+      let a = 0;
+      let b = 0;
+      let answer = 0;
+      let symbol = '+';
+      let tier = stageNum;
+      let tierName = `Stage ${stageNum}: ${stageDef.name}`;
+      let bonusSeconds = Math.min(5, stageNum);
+      let basePoints = stageNum * 15;
+
+      if (op === 'add') {
+        symbol = '+';
+        if (stageNum === 1) {
+          // Stage 1: Single digits, basic starter (sum <= 12)
+          a = this.randomInt(1, 6);
+          b = this.randomInt(1, 5);
+        } else if (stageNum === 2) {
+          // Stage 2: Carrying into teens/20s
+          a = this.randomInt(5, 16);
+          b = this.randomInt(4, 9);
+        } else if (stageNum === 3) {
+          // Stage 3: Double digits up to 50
+          a = this.randomInt(15, 38);
+          b = this.randomInt(12, 30);
+        } else if (stageNum === 4) {
+          // Stage 4: Numbers up to 100
+          a = this.randomInt(30, 75);
+          b = this.randomInt(25, 65);
+        } else if (stageNum === 5) {
+          // Stage 5: Advanced mental arithmetic
+          a = this.randomInt(55, 125);
+          b = this.randomInt(45, 95);
+        } else {
+          // Stage 6: Mythic arithmetic
+          a = this.randomInt(90, 250);
+          b = this.randomInt(70, 200);
+        }
+        answer = a + b;
+      } else if (op === 'sub') {
+        symbol = '−';
+        if (stageNum === 1) {
+          // Stage 1: Simple subtraction with positive result
+          a = this.randomInt(2, 10);
+          b = this.randomInt(1, a);
+        } else if (stageNum === 2) {
+          // Stage 2: Teens borrowing
+          a = this.randomInt(11, 20);
+          b = this.randomInt(3, a - 1);
+        } else if (stageNum === 3) {
+          // Stage 3: 2-digit subtraction
+          a = this.randomInt(25, 55);
+          b = this.randomInt(10, a - 2);
+        } else if (stageNum === 4) {
+          // Stage 4: Subtraction up to 100
+          a = this.randomInt(50, 95);
+          b = this.randomInt(20, a - 5);
+        } else if (stageNum === 5) {
+          // Stage 5: Subtraction up to 200
+          a = this.randomInt(80, 160);
+          b = this.randomInt(35, a - 10);
+        } else {
+          // Stage 6: Mythic subtraction
+          a = this.randomInt(150, 350);
+          b = this.randomInt(50, a - 20);
+        }
+        answer = a - b;
+      } else if (op === 'mul') {
+        symbol = '×';
+        if (stageNum === 2) {
+          // Stage 2: 2, 5, 10 times tables
+          const factors = [2, 5, 10];
+          a = factors[Math.floor(Math.random() * factors.length)];
+          b = this.randomInt(2, 9);
+        } else if (stageNum === 3) {
+          // Stage 3: 3, 4, 6, 7 times tables
+          const factors = [3, 4, 6, 7];
+          a = factors[Math.floor(Math.random() * factors.length)];
+          b = this.randomInt(3, 8);
+        } else if (stageNum === 4) {
+          // Stage 4: Tables up to 12
+          a = this.randomInt(6, 12);
+          b = this.randomInt(4, 12);
+        } else if (stageNum === 5) {
+          // Stage 5: Double-digit factors
+          a = this.randomInt(8, 15);
+          b = this.randomInt(6, 13);
+        } else {
+          // Stage 6: Mythic multiplication
+          a = this.randomInt(9, 18);
+          b = this.randomInt(7, 16);
+        }
+        answer = a * b;
+      } else if (op === 'div') {
+        symbol = '÷';
+        // Exact integer division with no remainders (dividend a = b * quotient)
+        let quotient = 2;
+        if (stageNum === 3) {
+          b = this.randomInt(2, 7);
+          quotient = this.randomInt(2, 8);
+        } else if (stageNum === 4) {
+          b = this.randomInt(4, 12);
+          quotient = this.randomInt(4, 12);
+        } else if (stageNum === 5) {
+          b = this.randomInt(6, 14);
+          quotient = this.randomInt(6, 14);
+        } else {
+          b = this.randomInt(7, 16);
+          quotient = this.randomInt(8, 16);
+        }
+        answer = quotient;
+        a = b * quotient;
+      }
+
+      return {
+        a,
+        b,
+        op,
+        symbol,
+        answer,
+        tier,
+        tierName,
+        bonusSeconds,
+        basePoints
+      };
     },
 
     generateQuestion() {
@@ -1093,6 +1443,12 @@
     // Sync settings from inputs
     validateSettings();
 
+    // Level Quest mode: untimed, 20 questions per level
+    if (state.gameMode === 'levelQuest') {
+      startLevelQuest();
+      return;
+    }
+
     // Reset game state
     state.isPlaying = true;
     state.isPaused = false;
@@ -1112,7 +1468,14 @@
     state.timerInitial = state.startingTime;
     state.lastTickTime = Date.now();
 
-    // Reset HUD
+    // Reset HUD visibility for regular modes
+    if (elements.hudLevelCard) elements.hudLevelCard.classList.remove('hidden');
+    if (elements.hudStageCard) elements.hudStageCard.classList.remove('hidden');
+    if (elements.hudStageProgressCard) elements.hudStageProgressCard.classList.remove('hidden');
+    if (elements.hudTimerContainer) {
+      elements.hudTimerContainer.classList.remove('hidden');
+      elements.hudTimerContainer.classList.remove('level-quest-mode');
+    }
     elements.hudScore.textContent = '0';
     elements.hudStreak.textContent = '0 🔥';
     elements.hudMultiplier.textContent = '1x';
@@ -1189,6 +1552,11 @@
   }
 
   function nextQuestion() {
+    // Level Quest mode: use level quest question flow
+    if (state.gameMode === 'levelQuest') {
+      nextLevelQuestion();
+      return;
+    }
     state.isSubmitting = false; // Release submission lock for the new question
     state.questionNumber++;
     state.currentQuestion = MathEngine.generateQuestion();
@@ -1234,6 +1602,11 @@
   }
 
   function submitAnswer() {
+    // Level Quest mode: use level quest answer flow
+    if (state.gameMode === 'levelQuest') {
+      submitLevelAnswer();
+      return;
+    }
     // Debounce & Lock: ignore rapid Enter keystrokes or double clicks on the same question
     if (!state.isPlaying || state.isSubmitting) return;
 
@@ -1359,6 +1732,11 @@
   }
 
   function skipQuestion() {
+    // Level Quest mode: use level quest skip flow
+    if (state.gameMode === 'levelQuest') {
+      skipLevelQuestion();
+      return;
+    }
     if (!state.isPlaying || state.isSubmitting) return;
     state.isSubmitting = true;
 
@@ -1925,6 +2303,352 @@
   }
 
   /* ==========================================================================
+     10b. LEVEL QUEST GAME CONTROLLER (20 questions / level, 80% to pass)
+     ========================================================================== */
+
+  // Switch config panel when mode changes
+  function switchGameMode(mode) {
+    state.gameMode = mode;
+    [elements.modeBtnStage, elements.modeBtnTime, elements.modeBtnLevelQuest].forEach(btn => {
+      const isCurrent = btn.dataset.mode === mode;
+      btn.classList.toggle('active', isCurrent);
+      btn.setAttribute('aria-checked', String(isCurrent));
+    });
+    if (elements.panelStageAdventure) {
+      elements.panelStageAdventure.classList.toggle('hidden', mode !== 'stageAdventure');
+    }
+    if (elements.panelTimeRush) {
+      elements.panelTimeRush.classList.toggle('hidden', mode !== 'timeRush');
+    }
+    if (elements.panelLevelQuest) {
+      elements.panelLevelQuest.classList.toggle('hidden', mode !== 'levelQuest');
+    }
+    if (elements.btnStartGame) {
+      const caption = elements.btnStartGame.querySelector('.btn-caption');
+      if (caption) {
+        if (mode === 'stageAdventure') {
+          caption.textContent = `START STAGE ${state.currentStage} 🚀`;
+        } else if (mode === 'levelQuest') {
+          caption.textContent = `START LEVEL ${state.currentLevel} 🏔️`;
+        } else {
+          caption.textContent = 'START GAME';
+        }
+      }
+    }
+    StorageManager.updateBestRecordUI();
+    if (mode === 'levelQuest') {
+      renderLevelGridUI();
+    } else {
+      renderStageGridUI();
+    }
+    SoundFX.playTap();
+  }
+
+  // Render level grid with unlock / stars state
+  function renderLevelGridUI() {
+    const unlocked = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.unlockedLevel) || 1;
+    const levelStars = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.stars) || {};
+    if (!elements.levelCards || elements.levelCards.length === 0) return;
+    elements.levelCards.forEach(card => {
+      const levelNum = parseInt(card.dataset.level, 10);
+      const isUnlocked = levelNum <= unlocked;
+      const isActive = levelNum === state.currentLevel;
+      card.classList.toggle('locked', !isUnlocked);
+      card.classList.toggle('active', isActive && isUnlocked);
+      card.setAttribute('aria-checked', String(isActive && isUnlocked));
+      card.setAttribute('aria-disabled', String(!isUnlocked));
+    });
+  }
+
+  // Start a Level Quest game
+  function startLevelQuest() {
+    state.isPlaying = true;
+    state.isPaused = false;
+    state.isSubmitting = false;
+    state.score = 0;
+    state.streak = 0;
+    state.bestStreak = 0;
+    state.playerLevel = 1;
+    state.highestLevelReached = 1;
+    state.correctCount = 0;
+    state.missedCount = 0;
+    state.totalAnswered = 0;
+    state.bonusTimeEarned = 0;
+    state.questionNumber = 0;
+    state.currentInput = '';
+    state.levelQuestionIndex = 0;
+    state.levelCorrectCount = 0;
+    state.levelMissedCount = 0;
+    elements.hudScore.textContent = '0';
+    elements.hudStreak.textContent = '0 🔥';
+    elements.hudMultiplier.textContent = '1x';
+    updateLevelHUD();
+    if (elements.hudTimerContainer) {
+      elements.hudTimerContainer.classList.add('level-quest-mode');
+    }
+    // Adjust HUD visibility for Level Quest (untimed)
+    if (elements.hudLevelCard) elements.hudLevelCard.classList.remove('hidden');
+    if (elements.hudStageCard) elements.hudStageCard.classList.add('hidden');
+    if (elements.hudStageProgressCard) elements.hudStageProgressCard.classList.remove('hidden');
+    if (elements.hudTimerContainer) elements.hudTimerContainer.classList.add('hidden');
+    if (elements.levelUpBanner) elements.levelUpBanner.classList.add('hidden');
+    if (elements.streakAchievementBanner) elements.streakAchievementBanner.classList.add('hidden');
+    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.add('hidden');
+    SoundFX.getAudioContext();
+    SoundFX.playTap();
+    switchScreen(elements.screenGame);
+    nextLevelQuestion();
+  }
+
+  // Present the next Level Quest question (or finish the level)
+  function nextLevelQuestion() {
+    state.isSubmitting = false;
+    state.levelQuestionIndex++;
+    state.questionNumber++;
+    if (state.levelQuestionIndex > state.levelQuestionsTotal) {
+      showLevelResult();
+      return;
+    }
+    state.currentQuestion = MathEngine.generateStageQuestion(state.currentLevel);
+    state.currentInput = '';
+    elements.answerText.textContent = '';
+    elements.questionCounter.textContent = `Question #${state.levelQuestionIndex} / ${state.levelQuestionsTotal}`;
+    elements.termA.textContent = String(state.currentQuestion.a);
+    elements.termOp.textContent = state.currentQuestion.symbol;
+    elements.termB.textContent = String(state.currentQuestion.b);
+    elements.questionTierBadge.innerHTML = `🏔️ Level ${state.currentLevel} • ${state.currentQuestion.tierName} <span class="tier-bonus-text">(No timer)</span>`;
+    elements.userAnswerBox.className = 'user-answer-box active';
+    elements.feedbackBanner.className = 'feedback-banner';
+    elements.feedbackMascot.textContent = '🌟';
+    elements.feedbackMsg.textContent = 'Type your answer and tap GO!';
+  }
+
+  // Submit a Level Quest answer
+  function submitLevelAnswer() {
+    if (!state.isPlaying || state.isSubmitting) return;
+    if (!state.currentInput || state.currentInput.trim() === '') {
+      elements.userAnswerBox.classList.add('shake');
+      setTimeout(() => elements.userAnswerBox.classList.remove('shake'), 400);
+      elements.feedbackBanner.className = 'feedback-banner incorrect';
+      elements.feedbackMascot.textContent = '👉';
+      elements.feedbackMsg.textContent = 'Please enter an answer first!';
+      return;
+    }
+    state.isSubmitting = true;
+    const userAnswer = parseInt(state.currentInput, 10);
+    const expected = state.currentQuestion.answer;
+    state.totalAnswered++;
+    if (userAnswer === expected) {
+      state.correctCount++;
+      state.levelCorrectCount++;
+      state.streak++;
+      if (state.streak > state.bestStreak) { state.bestStreak = state.streak; }
+      let multiplier = 1.0;
+      if (state.streak >= 100) multiplier = 4.0;
+      else if (state.streak >= 50) multiplier = 3.0;
+      else if (state.streak >= 20) multiplier = 2.5;
+      else if (state.streak >= 10) multiplier = 2.0;
+      else if (state.streak >= 5) multiplier = 1.5;
+      else if (state.streak >= 3) multiplier = 1.25;
+      const ptsEarned = Math.round(state.currentQuestion.basePoints * multiplier);
+      state.score += ptsEarned;
+      elements.hudScore.textContent = String(state.score);
+      elements.hudStreak.textContent = `${state.streak} 🔥`;
+      elements.hudMultiplier.textContent = `${multiplier}x`;
+      elements.scorePopup.textContent = `+${ptsEarned}`;
+      elements.scorePopup.classList.remove('show');
+      void elements.scorePopup.offsetWidth;
+      elements.scorePopup.classList.add('show');
+      SoundFX.playCorrect(state.currentQuestion.tier);
+      const STREAK_MILESTONES = {
+        5: { bonus: 25, title: '5 IN A ROW!', kicker: '🔥 SUPER STREAK!', desc: '+25 Streak Bonus Points!', icon: '🔥' },
+        10: { bonus: 50, title: '10 IN A ROW!', kicker: '⚡ UNSTOPPABLE!', desc: '+50 Streak Bonus Points! 2x Multiplier Active!', icon: '⚡' },
+        20: { bonus: 100, title: '20 IN A ROW!', kicker: '🌟 MATH MASTER!', desc: '+100 Streak Bonus Points!', icon: '🌟' },
+        50: { bonus: 250, title: '50 IN A ROW!', kicker: '🚀 LEGENDARY HERO!', desc: '+250 Streak Bonus Points!', icon: '🚀' },
+        100: { bonus: 500, title: '100 IN A ROW!', kicker: '👑 MYTHIC GODLIKE!', desc: '+500 Streak Bonus Points!', icon: '👑' }
+      };
+      if (STREAK_MILESTONES[state.streak]) {
+        const ms = STREAK_MILESTONES[state.streak];
+        state.score += ms.bonus;
+        elements.hudScore.textContent = String(state.score);
+        triggerStreakMilestone(state.streak, ms);
+      } else if (state.streak % 5 === 0 && state.streak > 5) {
+        setTimeout(() => SoundFX.playStreak(), 200);
+      }
+      while (state.score >= getLevelThreshold(state.playerLevel)) {
+        state.playerLevel++;
+        if (state.playerLevel > state.highestLevelReached) {
+          state.highestLevelReached = state.playerLevel;
+        }
+        triggerLevelUp(state.playerLevel);
+      }
+      updateLevelHUD();
+      elements.userAnswerBox.className = 'user-answer-box correct';
+      elements.feedbackBanner.className = 'feedback-banner correct';
+      const phrase = CORRECT_PHRASES[Math.floor(Math.random() * CORRECT_PHRASES.length)];
+      elements.feedbackMascot.textContent = phrase.mascot;
+      elements.feedbackMsg.textContent = `${phrase.text} (+${ptsEarned} pts)`;
+      setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 350);
+    } else {
+      state.missedCount++;
+      state.levelMissedCount++;
+      state.streak = 0;
+      elements.hudStreak.textContent = '0 🔥';
+      elements.hudMultiplier.textContent = '1x';
+      SoundFX.playIncorrect();
+      elements.userAnswerBox.className = 'user-answer-box shake';
+      elements.feedbackBanner.className = 'feedback-banner incorrect';
+      const encouragement = ENCOURAGING_TRY_AGAIN[Math.floor(Math.random() * ENCOURAGING_TRY_AGAIN.length)];
+      elements.feedbackMascot.textContent = encouragement.mascot;
+      elements.feedbackMsg.textContent = `${encouragement.text} (Correct: ${expected})`;
+      setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 750);
+    }
+  }
+
+  // Skip a Level Quest question
+  function skipLevelQuestion() {
+    if (!state.isPlaying || state.isSubmitting) return;
+    state.isSubmitting = true;
+    state.totalAnswered++;
+    state.levelMissedCount++;
+    state.streak = 0;
+    elements.hudStreak.textContent = '0 🔥';
+    elements.hudMultiplier.textContent = '1x';
+    SoundFX.playIncorrect();
+    const expected = state.currentQuestion.answer;
+    elements.feedbackBanner.className = 'feedback-banner';
+    elements.feedbackMascot.textContent = '⏭️';
+    elements.feedbackMsg.textContent = `Skipped! The answer was ${expected}.`;
+    setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 450);
+  }
+
+  // Show Level Quest result overlay (pass/fail)
+  function showLevelResult() {
+    state.isPlaying = false;
+    state.isSubmitting = false;
+    const total = state.levelQuestionsTotal;
+    const correct = state.levelCorrectCount;
+    const missed = state.levelMissedCount;
+    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const passed = accuracy >= 80;
+    const lvl = state.currentLevel;
+    if (passed) {
+      let stars = 1;
+      if (accuracy >= 95) stars = 3;
+      else if (accuracy >= 85) stars = 2;
+      const prevStars = state.saveData.levelProgress.stars[lvl] || 0;
+      if (stars > prevStars) { state.saveData.levelProgress.stars[lvl] = stars; }
+      if (accuracy > (state.saveData.levelProgress.bestAccuracy[lvl] || 0)) {
+        state.saveData.levelProgress.bestAccuracy[lvl] = accuracy;
+      }
+      if (state.score > (state.saveData.levelProgress.bestScore[lvl] || 0)) {
+        state.saveData.levelProgress.bestScore[lvl] = state.score;
+      }
+      const nextLevel = lvl + 1;
+      if (nextLevel > state.saveData.levelProgress.unlockedLevel) {
+        state.saveData.levelProgress.unlockedLevel = nextLevel;
+      }
+    }
+    StorageManager.saveData();
+    renderLevelGridUI();
+    if (elements.levelResultLevel) elements.levelResultLevel.textContent = String(lvl);
+    if (elements.levelResultAccuracy) elements.levelResultAccuracy.textContent = `${accuracy}%`;
+    if (elements.levelResultCorrect) elements.levelResultCorrect.textContent = `${correct} / ${total}`;
+    renderLevelResultPieChart(correct, missed);
+    if (passed) {
+      if (elements.levelResultMascot) elements.levelResultMascot.textContent = '🎉';
+      if (elements.levelResultTitle) {
+        elements.levelResultTitle.textContent = `LEVEL ${lvl} COMPLETE! 🎉`;
+        elements.levelResultTitle.style.color = '#059669';
+      }
+      if (elements.levelResultMessage) {
+        elements.levelResultMessage.textContent = `You scored ${accuracy}%! Level ${lvl} conquered!`;
+      }
+      if (elements.btnLevelNext) elements.btnLevelNext.classList.remove('hidden');
+      if (elements.btnLevelRetry) elements.btnLevelRetry.classList.add('hidden');
+      SoundFX.playCongrats();
+      triggerConfetti();
+    } else {
+      if (elements.levelResultMascot) elements.levelResultMascot.textContent = '😢';
+      if (elements.levelResultTitle) {
+        elements.levelResultTitle.textContent = `LEVEL ${lvl} NOT PASSED 😢`;
+        elements.levelResultTitle.style.color = '#dc2626';
+      }
+      if (elements.levelResultMessage) {
+        elements.levelResultMessage.textContent = `You scored ${accuracy}%. Need 80% to level up. Try again!`;
+      }
+      if (elements.btnLevelNext) elements.btnLevelNext.classList.add('hidden');
+      if (elements.btnLevelRetry) elements.btnLevelRetry.classList.remove('hidden');
+      SoundFX.playFailure();
+    }
+    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.remove('hidden');
+  }
+
+  // Hide Level Quest result overlay
+  function hideLevelResult() {
+    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.add('hidden');
+  }
+
+  // Render Level Quest result pie chart
+  function renderLevelResultPieChart(correct, missed) {
+    const total = correct + missed;
+    const safeCorrect = total === 0 ? 1 : correct;
+    const safeMissed = total === 0 ? 0 : missed;
+    if (typeof Chart !== 'undefined') {
+      try {
+        if (elements.levelResultSvgFallback) elements.levelResultSvgFallback.classList.add('hidden');
+        if (elements.levelResultChartCanvas) elements.levelResultChartCanvas.classList.remove('hidden');
+        const ctx = elements.levelResultChartCanvas.getContext('2d');
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Correct', 'Missed/Skipped'],
+            datasets: [{
+              data: [safeCorrect, safeMissed],
+              backgroundColor: ['#10b981', '#f87171'],
+              borderColor: ['#ffffff', '#ffffff'],
+              borderWidth: 4,
+              hoverOffset: 6
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            cutout: '68%'
+          }
+        });
+        return;
+      } catch (err) {
+        console.warn('Level result Chart.js failed, using SVG fallback', err);
+      }
+    }
+    if (elements.levelResultChartCanvas) elements.levelResultChartCanvas.classList.add('hidden');
+    if (elements.levelResultSvgFallback) elements.levelResultSvgFallback.classList.remove('hidden');
+    const correctPct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const radius = 60;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (correctPct / 100) * circumference;
+    elements.levelResultSvgFallback.innerHTML = `
+      <svg width="200" height="200" viewBox="0 0 160 160">
+        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#fecaca" stroke-width="24" />
+        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#10b981" stroke-width="24"
+          stroke-dasharray="${circumference}"
+          stroke-dashoffset="${strokeDashoffset}"
+          stroke-linecap="round"
+          transform="rotate(-90 80 80)"
+        />
+        <text x="80" y="72" text-anchor="middle" font-family="'Fredoka', sans-serif" font-weight="700" font-size="28" fill="#1e293b">
+          ${correctPct}%
+        </text>
+        <text x="80" y="96" text-anchor="middle" font-family="'Quicksand', sans-serif" font-weight="700" font-size="12" fill="#64748b">
+          ACCURACY
+        </text>
+      </svg>
+    `;
+  }
+
+  /* ==========================================================================
      11. EVENT LISTENERS SETUP
      ========================================================================== */
   function setupEventListeners() {
@@ -1944,6 +2668,11 @@
       }
     });
 
+    // Mode Selection: Stage Adventure / Time Rush / Level Quest
+    elements.modeBtnStage.addEventListener('click', () => switchGameMode('stageAdventure'));
+    elements.modeBtnTime.addEventListener('click', () => switchGameMode('timeRush'));
+    elements.modeBtnLevelQuest.addEventListener('click', () => switchGameMode('levelQuest'));
+
     elements.btnSoundToggle.addEventListener('click', () => {
       StorageManager.toggleSound();
     });
@@ -1956,6 +2685,20 @@
     elements.presetCards.forEach(card => {
       card.addEventListener('click', () => {
         applyPreset(card.dataset.preset);
+      });
+    });
+
+    // Level Quest Level Selection
+    elements.levelCards.forEach(card => {
+      card.addEventListener('click', () => {
+        if (card.classList.contains('locked')) return;
+        state.currentLevel = parseInt(card.dataset.level, 10);
+        renderLevelGridUI();
+        if (elements.btnStartGame) {
+          const caption = elements.btnStartGame.querySelector('.btn-caption');
+          if (caption) caption.textContent = `START LEVEL ${state.currentLevel} 🏔️`;
+        }
+        SoundFX.playTap();
       });
     });
 
@@ -1986,6 +2729,31 @@
     // Start Game
     elements.btnStartGame.addEventListener('click', () => {
       startGame();
+    });
+
+    // Landing Page: Game Card Selection
+    elements.gameCards.forEach(card => {
+      card.addEventListener('click', () => {
+        if (card.classList.contains('disabled')) return;
+        elements.gameCards.forEach(c => {
+          c.classList.remove('active');
+          c.setAttribute('aria-checked', 'false');
+        });
+        card.classList.add('active');
+        card.setAttribute('aria-checked', 'true');
+        elements.selectedGame = card.dataset.game || 'math-blast';
+        SoundFX.playTap();
+      });
+    });
+
+    // Landing Page: Play Selected Game
+    elements.btnPlaySelectedGame.addEventListener('click', () => {
+      if (elements.selectedGame === 'math-blast') {
+        elements.screenLanding.classList.remove('active');
+        elements.screenConfig.classList.add('active');
+      } else {
+        SoundFX.playTap();
+      }
     });
 
     // On-screen keypad digits
@@ -2078,6 +2846,29 @@
 
     elements.btnSummaryHistory.addEventListener('click', () => {
       renderHistoryModal();
+    });
+
+    // Level Quest Result Overlay Buttons
+    elements.btnLevelNext.addEventListener('click', () => {
+      hideLevelResult();
+      // Advance to next unlocked level if available
+      const unlocked = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.unlockedLevel) || 1;
+      const nextLevel = Math.min(state.currentLevel + 1, unlocked);
+      state.currentLevel = nextLevel;
+      renderLevelGridUI();
+      startLevelQuest();
+    });
+
+    elements.btnLevelRetry.addEventListener('click', () => {
+      hideLevelResult();
+      startLevelQuest();
+    });
+
+    elements.btnLevelQuit.addEventListener('click', () => {
+      hideLevelResult();
+      state.isPlaying = false;
+      if (state.timerIntervalId) clearInterval(state.timerIntervalId);
+      switchScreen(elements.screenConfig);
     });
 
     // History Modal

@@ -60,6 +60,57 @@
     <main id="main-content">
 
       <!-- ==============================================
+           SCREEN 0: LANDING PAGE - GAME SELECTION
+           ============================================== -->
+      <section id="screen-landing" class="screen active" aria-labelledby="landing-heading">
+        <div class="card landing-card">
+          <div class="landing-hero">
+            <div class="landing-mascot" aria-hidden="true">🎮</div>
+            <h1 id="landing-heading" class="landing-title">Math Games!</h1>
+            <p class="landing-subtitle">Pick your adventure and start playing!</p>
+          </div>
+
+          <div class="landing-games-grid" role="radiogroup" aria-label="Choose a game">
+            <!-- Math Blast: Playable -->
+            <button type="button" class="game-card active" data-game="math-blast" role="radio" aria-checked="true">
+              <span class="game-badge">Play Now</span>
+              <span class="game-icon">🚀</span>
+              <div class="game-text">
+                <span class="game-name">Math Blast!</span>
+                <span class="game-desc">Stage Adventure • Time Rush • Level Quest</span>
+              </div>
+            </button>
+
+            <!-- Coming Soon Placeholders -->
+            <button type="button" class="game-card disabled" data-game="coming-soon-1" role="radio" aria-disabled="true" aria-checked="false">
+              <span class="game-badge">Coming Soon</span>
+              <span class="game-icon">🧩</span>
+              <div class="game-text">
+                <span class="game-name">Puzzle Quest</span>
+                <span class="game-desc">Logic puzzles coming soon!</span>
+              </div>
+            </button>
+
+            <button type="button" class="game-card disabled" data-game="coming-soon-2" role="radio" aria-disabled="true" aria-checked="false">
+              <span class="game-badge">Coming Soon</span>
+              <span class="game-icon">🎨</span>
+              <div class="game-text">
+                <span class="game-name">Shape Matcher</span>
+                <span class="game-desc">Geometry fun coming soon!</span>
+              </div>
+            </button>
+          </div>
+
+          <div class="landing-actions">
+            <button id="btn-play-selected-game" class="btn btn-primary btn-large btn-glow">
+              <span class="btn-emoji">🚀</span>
+              <span class="btn-caption">PLAY SELECTED GAME</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==============================================
            SCREEN 1: CONFIGURATION & SETUP SCREEN
            ============================================== -->
       <section id="screen-config" class="screen active" aria-labelledby="config-heading">
@@ -67,47 +118,239 @@
           <div class="config-hero">
             <div class="hero-mascot" aria-hidden="true">🚀</div>
             <h2 id="config-heading" class="hero-title">Ready for a Math Challenge?</h2>
-            <p class="hero-subtitle">Choose your level, pick your operations, and blast off!</p>
+            <p class="hero-subtitle">Choose your adventure mode and blast off!</p>
           </div>
 
-          <!-- Difficulty Presets -->
+          <!-- Game Mode Selector: Stage Adventure vs Time Rush -->
           <div class="config-section">
             <label class="section-label">
-              <span class="label-icon">🎯</span>
-              <span class="label-title">Choose Difficulty Level</span>
+              <span class="label-icon">🎮</span>
+              <span class="label-title">Choose Game Mode</span>
             </label>
-            <div class="preset-grid" role="radiogroup" aria-label="Difficulty Level">
-              <button type="button" class="preset-card active" data-preset="easy" role="radio" aria-checked="true">
-                <span class="preset-badge">Starter</span>
-                <span class="preset-icon">🌱</span>
-                <span class="preset-name">Easy</span>
-                <span class="preset-desc">Single-digit + & − (e.g. 4 + 5)</span>
+            <div class="mode-select-grid" role="radiogroup" aria-label="Game Mode Selection">
+              <button type="button" class="mode-card active" id="mode-btn-stage" data-mode="stageAdventure" role="radio" aria-checked="true">
+                <span class="mode-badge">Recommended</span>
+                <span class="mode-icon">🗺️</span>
+                <div class="mode-text">
+                  <span class="mode-name">Stage Adventure</span>
+                  <span class="mode-desc">10 questions per stage. Score 80%+ accuracy to unlock the next level!</span>
+                </div>
               </button>
 
-              <button type="button" class="preset-card" data-preset="medium" role="radio" aria-checked="false">
-                <span class="preset-badge">Explorer</span>
-                <span class="preset-icon">⚡</span>
-                <span class="preset-name">Medium</span>
-                <span class="preset-desc">Up to 20 with +, − & simple ×</span>
+              <button type="button" class="mode-card" id="mode-btn-time" data-mode="timeRush" role="radio" aria-checked="false">
+                <span class="mode-badge">Arcade</span>
+                <span class="mode-icon">⏱️</span>
+                <div class="mode-text">
+                  <span class="mode-name">Time Rush</span>
+                  <span class="mode-desc">Beat the countdown clock, earn bonus seconds, and level up live!</span>
+                </div>
               </button>
 
-              <button type="button" class="preset-card" data-preset="hard" role="radio" aria-checked="false">
-                <span class="preset-badge">Champion</span>
-                <span class="preset-icon">🏆</span>
-                <span class="preset-name">Hard</span>
-                <span class="preset-desc">Up to 100 with +, −, × & exact ÷</span>
-              </button>
-
-              <button type="button" class="preset-card" data-preset="custom" role="radio" aria-checked="false">
-                <span class="preset-badge">Custom</span>
-                <span class="preset-icon">⚙️</span>
-                <span class="preset-name">Custom</span>
-                <span class="preset-desc">Pick your own math rules!</span>
+              <button type="button" class="mode-card" id="mode-btn-level-quest" data-mode="levelQuest" role="radio" aria-checked="false">
+                <span class="mode-badge">Quest</span>
+                <span class="mode-icon">🏔️</span>
+                <div class="mode-text">
+                  <span class="mode-name">Level Quest</span>
+                  <span class="mode-desc">20 questions per level. Score 80%+ to level up! No timer pressure.</span>
+                </div>
               </button>
             </div>
           </div>
 
-          <!-- Operations Toggle -->
+          <!-- PANEL A: STAGE ADVENTURE PANEL -->
+          <div id="panel-stage-adventure" class="mode-panel">
+            <div class="config-section">
+              <div class="section-label-row">
+                <label class="section-label">
+                  <span class="label-icon">🗺️</span>
+                  <span class="label-title">Select Stage</span>
+                </label>
+                <span class="section-hint" id="stage-pass-rule">🎯 10 Questions • Need ≥80% to Unlock Next Stage</span>
+              </div>
+              <div class="stage-grid" id="stage-grid" role="radiogroup" aria-label="Stages">
+                <!-- Dynamically populated or rendered by HTML & JS -->
+                <button type="button" class="stage-card active" data-stage="1" role="radio" aria-checked="true">
+                  <span class="stage-badge">Stage 1</span>
+                  <span class="stage-icon">🌱</span>
+                  <span class="stage-name">Starter Grove</span>
+                  <span class="stage-desc">Single-digit + & − (Basic)</span>
+                  <div class="stage-stars" id="stage-stars-1">☆☆☆</div>
+                </button>
+
+                <button type="button" class="stage-card" data-stage="2" role="radio" aria-checked="false">
+                  <span class="stage-badge">Stage 2</span>
+                  <span class="stage-icon">⚡</span>
+                  <span class="stage-name">Carrying Crossing</span>
+                  <span class="stage-desc">Carrying, borrowing, 2×, 5×, 10×</span>
+                  <div class="stage-stars" id="stage-stars-2">☆☆☆</div>
+                </button>
+
+                <button type="button" class="stage-card" data-stage="3" role="radio" aria-checked="false">
+                  <span class="stage-badge">Stage 3</span>
+                  <span class="stage-icon">🚀</span>
+                  <span class="stage-name">Digit Mountain</span>
+                  <span class="stage-desc">Double-digits, 3×-7×, simple ÷</span>
+                  <div class="stage-stars" id="stage-stars-3">☆☆☆</div>
+                </button>
+
+                <button type="button" class="stage-card" data-stage="4" role="radio" aria-checked="false">
+                  <span class="stage-badge">Stage 4</span>
+                  <span class="stage-icon">🏆</span>
+                  <span class="stage-name">Champion Fortress</span>
+                  <span class="stage-desc">Multiplication to 12, division to 144</span>
+                  <div class="stage-stars" id="stage-stars-4">☆☆☆</div>
+                </button>
+
+                <button type="button" class="stage-card" data-stage="5" role="radio" aria-checked="false">
+                  <span class="stage-badge">Stage 5</span>
+                  <span class="stage-icon">💎</span>
+                  <span class="stage-name">Wizard Peak</span>
+                  <span class="stage-desc">Advanced mental arithmetic</span>
+                  <div class="stage-stars" id="stage-stars-5">☆☆☆</div>
+                </button>
+
+                <button type="button" class="stage-card" data-stage="6" role="radio" aria-checked="false">
+                  <span class="stage-badge">Stage 6</span>
+                  <span class="stage-icon">👑</span>
+                  <span class="stage-name">Mythic Realm</span>
+                  <span class="stage-desc">Grandmaster arithmetic mastery</span>
+                  <div class="stage-stars" id="stage-stars-6">☆☆☆</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Stage Rule Banner -->
+            <div class="stage-rules-banner">
+              <span class="rules-icon">🎯</span>
+              <div class="rules-text">
+                <strong>Stage Rule:</strong> All 10 questions in a stage share the exact same difficulty level. Earn <strong>80% accuracy or higher (8/10 correct)</strong> to conquer the stage and unlock the next challenge!
+              </div>
+            </div>
+          </div>
+
+          <!-- PANEL B: TIME RUSH PANEL (Shown when Time Rush is selected) -->
+          <div id="panel-time-rush" class="mode-panel hidden">
+            <!-- Difficulty Presets -->
+            <div class="config-section">
+              <label class="section-label">
+                <span class="label-icon">🎯</span>
+                <span class="label-title">Choose Difficulty Level</span>
+              </label>
+              <div class="preset-grid" role="radiogroup" aria-label="Difficulty Level">
+                <button type="button" class="preset-card active" data-preset="easy" role="radio" aria-checked="true">
+                  <span class="preset-badge">Starter</span>
+                  <span class="preset-icon">🌱</span>
+                  <span class="preset-name">Easy</span>
+                  <span class="preset-desc">Single-digit + & − (e.g. 4 + 5)</span>
+                </button>
+
+                <button type="button" class="preset-card" data-preset="medium" role="radio" aria-checked="false">
+                  <span class="preset-badge">Explorer</span>
+                  <span class="preset-icon">⚡</span>
+                  <span class="preset-name">Medium</span>
+                  <span class="preset-desc">Up to 20 with +, − & simple ×</span>
+                </button>
+
+                <button type="button" class="preset-card" data-preset="hard" role="radio" aria-checked="false">
+                  <span class="preset-badge">Champion</span>
+                  <span class="preset-icon">🏆</span>
+                  <span class="preset-name">Hard</span>
+                  <span class="preset-desc">Up to 100 with +, −, × & exact ÷</span>
+                </button>
+
+                <button type="button" class="preset-card" data-preset="custom" role="radio" aria-checked="false">
+                  <span class="preset-badge">Custom</span>
+                  <span class="preset-icon">⚙️</span>
+                  <span class="preset-name">Custom</span>
+                  <span class="preset-desc">Pick your own math rules!</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Starting Time Allowed -->
+            <div class="config-section">
+              <label class="section-label">
+                <span class="label-icon">⏱️</span>
+                <span class="label-title">Starting Time</span>
+              </label>
+              <div class="timer-chips-grid" role="radiogroup" aria-label="Timer Duration">
+                <button type="button" class="timer-chip" data-time="30">30s <span>Sprint</span></button>
+                <button type="button" class="timer-chip active" data-time="60">60s <span>Standard</span></button>
+                <button type="button" class="timer-chip" data-time="90">90s <span>Endurance</span></button>
+                <button type="button" class="timer-chip" data-time="120">120s <span>Marathon</span></button>
+                <div class="custom-time-wrapper">
+                  <label for="custom-time-input" class="sr-only">Custom seconds</label>
+                  <input type="number" id="custom-time-input" min="15" max="300" placeholder="Custom" aria-label="Custom seconds">
+                  <span class="unit">sec</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Bonus Time Explanation Card -->
+            <div class="bonus-explainer-banner">
+              <span class="explainer-icon">💡</span>
+              <div class="explainer-text">
+                <strong>Earn Bonus Seconds!</strong> Harder questions reward you with <strong>+2s to +5s extra time</strong> on the clock when answered correctly! Take your time and think carefully.
+              </div>
+            </div>
+          </div>
+
+          <!-- PANEL C: LEVEL QUEST PANEL (Shown when Level Quest is selected) -->
+          <div id="panel-level-quest" class="mode-panel hidden">
+            <!-- Level Selector -->
+            <div class="config-section">
+              <div class="section-label-row">
+                <label class="section-label">
+                  <span class="label-icon">🏔️</span>
+                  <span class="label-title">Select Level</span>
+                </label>
+                <span class="section-hint" id="level-pass-rule">🎯 20 Questions • Need ≥80% to Level Up</span>
+              </div>
+              <div class="level-grid" id="level-grid" role="radiogroup" aria-label="Levels">
+                <!-- Dynamically populated by JavaScript -->
+                <button type="button" class="level-card active" data-level="1" role="radio" aria-checked="true">
+                  <span class="level-badge">Level 1</span>
+                  <span class="level-icon">🌱</span>
+                  <span class="level-name">Starter Peaks</span>
+                  <span class="level-desc">Single-digit + & −</span>
+                </button>
+                <button type="button" class="level-card" data-level="2" role="radio" aria-checked="false">
+                  <span class="level-badge">Level 2</span>
+                  <span class="level-icon">⚡</span>
+                  <span class="level-name">Carrying Cliffs</span>
+                  <span class="level-desc">2-digit + & −, 2×, 5×, 10×</span>
+                </button>
+                <button type="button" class="level-card" data-level="3" role="radio" aria-checked="false">
+                  <span class="level-badge">Level 3</span>
+                  <span class="level-icon">🚀</span>
+                  <span class="level-name">Digit Ridge</span>
+                  <span class="level-desc">Double-digits, 3×-7×, simple ÷</span>
+                </button>
+                <button type="button" class="level-card" data-level="4" role="radio" aria-checked="false">
+                  <span class="level-badge">Level 4</span>
+                  <span class="level-icon">🏆</span>
+                  <span class="level-name">Champion Crags</span>
+                  <span class="level-desc">Multiplication to 12, division to 144</span>
+                </button>
+                <button type="button" class="level-card" data-level="5" role="radio" aria-checked="false">
+                  <span class="level-badge">Level 5</span>
+                  <span class="level-icon">💎</span>
+                  <span class="level-name">Wizard Spire</span>
+                  <span class="level-desc">Advanced mental arithmetic</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Level Rule Banner -->
+            <div class="level-rules-banner">
+              <span class="rules-icon">🏔️</span>
+              <div class="rules-text">
+                <strong>Level Rule:</strong> All <strong>20 questions</strong> in a level share the same difficulty. Earn <strong>80% accuracy or higher (16/20 correct)</strong> to conquer the level and unlock the next challenge!
+              </div>
+            </div>
+          </div>
+
+          <!-- Operations Toggle (Available for both modes) -->
           <div class="config-section">
             <div class="section-label-row">
               <label class="section-label">
@@ -144,33 +387,6 @@
             </div>
           </div>
 
-          <!-- Starting Time Allowed -->
-          <div class="config-section">
-            <label class="section-label">
-              <span class="label-icon">⏱️</span>
-              <span class="label-title">Starting Time</span>
-            </label>
-            <div class="timer-chips-grid" role="radiogroup" aria-label="Timer Duration">
-              <button type="button" class="timer-chip" data-time="30">30s <span>Sprint</span></button>
-              <button type="button" class="timer-chip active" data-time="60">60s <span>Standard</span></button>
-              <button type="button" class="timer-chip" data-time="90">90s <span>Endurance</span></button>
-              <button type="button" class="timer-chip" data-time="120">120s <span>Marathon</span></button>
-              <div class="custom-time-wrapper">
-                <label for="custom-time-input" class="sr-only">Custom seconds</label>
-                <input type="number" id="custom-time-input" min="15" max="300" placeholder="Custom" aria-label="Custom seconds">
-                <span class="unit">sec</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Bonus Time Explanation Card -->
-          <div class="bonus-explainer-banner">
-            <span class="explainer-icon">💡</span>
-            <div class="explainer-text">
-              <strong>Earn Bonus Seconds!</strong> Harder math questions reward you with <strong>+2s to +5s extra time</strong> on the clock when answered correctly! Take your time and think carefully.
-            </div>
-          </div>
-
           <!-- Current Best Record Preview -->
           <div class="best-record-pill" id="config-best-record">
             <span class="trophy-emoji">🏆</span>
@@ -195,12 +411,28 @@
         
         <!-- Live Game Stats Bar -->
         <div class="game-hud">
-          <!-- Level Card -->
-          <div class="hud-card level-card">
+          <!-- Level Card (For Time Rush Mode) -->
+          <div class="hud-card level-card" id="hud-level-card">
             <span class="hud-label">LEVEL</span>
             <div class="hud-value" id="hud-level">1 ⭐</div>
             <div class="level-progress-track" title="XP progress towards next level">
               <div class="level-progress-fill" id="level-bar-fill"></div>
+            </div>
+          </div>
+
+          <!-- Stage Card (For Stage Adventure Mode) -->
+          <div class="hud-card stage-card" id="hud-stage-card">
+            <span class="hud-label">STAGE</span>
+            <div class="hud-value" id="hud-stage-num">1 🗺️</div>
+            <span class="stage-subname" id="hud-stage-name">Starter</span>
+          </div>
+
+          <!-- Stage Progress Card (For Stage Adventure Mode) -->
+          <div class="hud-card stage-progress-card" id="hud-stage-progress-card">
+            <span class="hud-label">PROGRESS</span>
+            <div class="hud-value" id="hud-stage-progress">1 / 10</div>
+            <div class="stage-progress-track">
+              <div class="stage-progress-fill" id="stage-progress-fill"></div>
             </div>
           </div>
 
@@ -211,7 +443,7 @@
             <div class="score-popup" id="score-popup" aria-hidden="true"></div>
           </div>
 
-          <!-- Urgency Countdown Clock -->
+          <!-- Urgency Countdown Clock (For Time Rush Mode) -->
           <div class="hud-card timer-card" id="hud-timer-container">
             <span class="hud-label">TIME LEFT</span>
             <div class="timer-display-group">
@@ -332,6 +564,49 @@
             </p>
           </div>
         </div>
+
+        <!-- ==============================================
+             LEVEL QUEST RESULT OVERLAY (Shown after 20 questions)
+             ============================================== -->
+        <div id="level-result-overlay" class="level-result-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="level-result-heading">
+          <div class="level-result-dialog">
+            <div class="level-result-mascot" id="level-result-mascot">🎉</div>
+            <h2 id="level-result-heading" class="level-result-title">Level 1 Complete!</h2>
+            <div class="level-result-stats">
+              <div class="level-stat">
+                <span class="level-stat-label">Accuracy</span>
+                <span class="level-stat-value" id="level-result-accuracy">0%</span>
+              </div>
+              <div class="level-stat">
+                <span class="level-stat-label">Correct</span>
+                <span class="level-stat-value" id="level-result-correct">0 / 20</span>
+              </div>
+              <div class="level-stat">
+                <span class="level-stat-label">Level</span>
+                <span class="level-stat-value" id="level-result-level">1</span>
+              </div>
+            </div>
+            <div class="level-result-chart">
+              <canvas id="levelResultChart" width="240" height="240" role="img" aria-label="Level accuracy pie chart"></canvas>
+              <div id="level-result-svg-fallback" class="svg-fallback-chart hidden"></div>
+            </div>
+            <p class="level-result-message" id="level-result-message">Great job!</p>
+            <div class="level-result-actions">
+              <button id="btn-level-next" class="btn btn-primary btn-large btn-glow hidden">
+                <span class="btn-emoji">🚀</span>
+                <span id="btn-level-next-text">Next Level</span>
+              </button>
+              <button id="btn-level-retry" class="btn btn-secondary btn-large hidden">
+                <span class="btn-emoji">🔄</span>
+                <span id="btn-level-retry-text">Retry Level</span>
+              </button>
+              <button id="btn-level-quit" class="btn btn-tertiary btn-large">
+                <span class="btn-emoji">⚙️</span>
+                <span>Back to Map</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ==============================================
@@ -348,6 +623,16 @@
               <p class="banner-subtitle">You beat your previous personal best! Incredible job!</p>
             </div>
             <span class="banner-sparkle">🏆</span>
+          </div>
+
+          <!-- Stage Result Banner (For Stage Adventure Mode) -->
+          <div id="stage-result-banner" class="stage-result-banner hidden" role="alert">
+            <span class="stage-result-icon" id="stage-result-icon">🎉</span>
+            <div class="stage-result-info">
+              <h3 class="stage-result-title" id="stage-result-title">STAGE 1 CLEARED!</h3>
+              <p class="stage-result-sub" id="stage-result-sub">You scored 90% accuracy! Stage 2 is now unlocked!</p>
+              <div class="stage-stars-display" id="stage-stars-display">⭐⭐⭐</div>
+            </div>
           </div>
 
           <div class="summary-hero">
@@ -419,13 +704,17 @@
 
           <!-- Action Buttons -->
           <div class="summary-actions-row">
-            <button id="btn-play-again" class="btn btn-primary btn-large btn-glow">
+            <button id="btn-next-stage" class="btn btn-primary btn-large btn-glow hidden">
+              <span class="btn-emoji">🚀</span>
+              <span id="btn-next-stage-text">Next Stage</span>
+            </button>
+            <button id="btn-play-again" class="btn btn-secondary btn-large">
               <span class="btn-emoji">🔄</span>
-              <span>Play Again</span>
+              <span id="btn-play-again-text">Play Again</span>
             </button>
             <button id="btn-change-settings" class="btn btn-secondary btn-large">
               <span class="btn-emoji">⚙️</span>
-              <span>Change Settings</span>
+              <span id="btn-change-settings-text">Stage Map / Settings</span>
             </button>
             <button id="btn-summary-history" class="btn btn-tertiary btn-large">
               <span class="btn-emoji">📈</span>
@@ -500,11 +789,11 @@
                   <tr>
                     <th>Date & Time</th>
                     <th>Mode</th>
-                    <th>Max Level</th>
+                    <th>Stage / Level</th>
                     <th>Score</th>
                     <th>Accuracy</th>
                     <th>Correct</th>
-                    <th>Time</th>
+                    <th>Result / Time</th>
                   </tr>
                 </thead>
                 <tbody id="history-tbody">
