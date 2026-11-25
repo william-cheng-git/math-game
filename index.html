@@ -228,45 +228,107 @@
             </div>
           </div>
 
-          <!-- PANEL B: TIME RUSH PANEL (Shown when Time Rush is selected) -->
-          <div id="panel-time-rush" class="mode-panel hidden">
-            <!-- Difficulty Presets -->
-            <div class="config-section">
-              <label class="section-label">
-                <span class="label-icon">🎯</span>
-                <span class="label-title">Choose Difficulty Level</span>
-              </label>
-              <div class="preset-grid" role="radiogroup" aria-label="Difficulty Level">
-                <button type="button" class="preset-card active" data-preset="easy" role="radio" aria-checked="true">
-                  <span class="preset-badge">Starter</span>
-                  <span class="preset-icon">🌱</span>
-                  <span class="preset-name">Easy</span>
-                  <span class="preset-desc">Single-digit + & − (e.g. 4 + 5)</span>
-                </button>
+          <!-- Difficulty Presets (Always visible) -->
+          <div class="config-section">
+            <label class="section-label">
+              <span class="label-icon">🎯</span>
+              <span class="label-title">Choose Difficulty Level</span>
+            </label>
+            <div class="preset-grid" role="radiogroup" aria-label="Difficulty Level">
+              <button type="button" class="preset-card active" data-preset="easy" role="radio" aria-checked="true">
+                <span class="preset-badge">Starter</span>
+                <span class="preset-icon">🌱</span>
+                <span class="preset-name">Easy</span>
+                <span class="preset-desc">Single-digit + & − (e.g. 4 + 5)</span>
+              </button>
 
-                <button type="button" class="preset-card" data-preset="medium" role="radio" aria-checked="false">
-                  <span class="preset-badge">Explorer</span>
-                  <span class="preset-icon">⚡</span>
-                  <span class="preset-name">Medium</span>
-                  <span class="preset-desc">Up to 20 with +, − & simple ×</span>
-                </button>
+              <button type="button" class="preset-card" data-preset="medium" role="radio" aria-checked="false">
+                <span class="preset-badge">Explorer</span>
+                <span class="preset-icon">⚡</span>
+                <span class="preset-name">Medium</span>
+                <span class="preset-desc">Up to 20 with +, − & simple ×</span>
+              </button>
 
-                <button type="button" class="preset-card" data-preset="hard" role="radio" aria-checked="false">
-                  <span class="preset-badge">Champion</span>
-                  <span class="preset-icon">🏆</span>
-                  <span class="preset-name">Hard</span>
-                  <span class="preset-desc">Up to 100 with +, −, × & exact ÷</span>
-                </button>
+              <button type="button" class="preset-card" data-preset="hard" role="radio" aria-checked="false">
+                <span class="preset-badge">Champion</span>
+                <span class="preset-icon">🏆</span>
+                <span class="preset-name">Hard</span>
+                <span class="preset-desc">Up to 100 with +, −, × & exact ÷</span>
+              </button>
 
-                <button type="button" class="preset-card" data-preset="custom" role="radio" aria-checked="false">
-                  <span class="preset-badge">Custom</span>
-                  <span class="preset-icon">⚙️</span>
-                  <span class="preset-name">Custom</span>
-                  <span class="preset-desc">Pick your own math rules!</span>
-                </button>
+              <button type="button" class="preset-card" data-preset="custom" role="radio" aria-checked="false">
+                <span class="preset-badge">Custom</span>
+                <span class="preset-icon">⚙️</span>
+                <span class="preset-name">Custom</span>
+                <span class="preset-desc">Pick your own math rules!</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Custom Number Range Controls (Shown only when Custom preset is selected) -->
+          <div id="custom-range-section" class="config-section hidden">
+            <label class="section-label">
+              <span class="label-icon">🔢</span>
+              <span class="label-title">Custom Number Ranges</span>
+            </label>
+            <p class="section-hint">Set min/max for each operation:</p>
+            <div class="custom-range-grid" role="group" aria-label="Custom number ranges">
+              <!-- Addition -->
+              <div class="range-control">
+                <label class="range-label">
+                  <span class="range-op-symbol">+</span>
+                  <span class="range-op-name">Addition</span>
+                </label>
+                <div class="range-inputs">
+                  <input type="number" id="custom-add-min" min="1" max="999" value="1" placeholder="Min">
+                  <span class="range-dash">−</span>
+                  <input type="number" id="custom-add-max" min="1" max="999" value="99" placeholder="Max">
+                </div>
+              </div>
+
+              <!-- Subtraction -->
+              <div class="range-control">
+                <label class="range-label">
+                  <span class="range-op-symbol">−</span>
+                  <span class="range-op-name">Subtraction</span>
+                </label>
+                <div class="range-inputs">
+                  <input type="number" id="custom-sub-min" min="1" max="999" value="2" placeholder="Min">
+                  <span class="range-dash">−</span>
+                  <input type="number" id="custom-sub-max" min="1" max="999" value="99" placeholder="Max">
+                </div>
+              </div>
+
+              <!-- Multiplication -->
+              <div class="range-control">
+                <label class="range-label">
+                  <span class="range-op-symbol">×</span>
+                  <span class="range-op-name">Multiplication</span>
+                </label>
+                <div class="range-inputs">
+                  <input type="number" id="custom-mul-min" min="1" max="999" value="1" placeholder="Min">
+                  <span class="range-dash">−</span>
+                  <input type="number" id="custom-mul-max" min="1" max="999" value="12" placeholder="Max">
+                </div>
+              </div>
+
+              <!-- Division -->
+              <div class="range-control">
+                <label class="range-label">
+                  <span class="range-op-symbol">÷</span>
+                  <span class="range-op-name">Division</span>
+                </label>
+                <div class="range-inputs">
+                  <input type="number" id="custom-div-min" min="1" max="999" value="1" placeholder="Min">
+                  <span class="range-dash">−</span>
+                  <input type="number" id="custom-div-max" min="1" max="999" value="144" placeholder="Max">
+                </div>
               </div>
             </div>
+          </div>
 
+          <!-- PANEL B: TIME RUSH PANEL (Shown when Time Rush is selected) -->
+          <div id="panel-time-rush" class="mode-panel hidden">
             <!-- Starting Time Allowed -->
             <div class="config-section">
               <label class="section-label">

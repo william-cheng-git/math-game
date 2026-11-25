@@ -121,7 +121,14 @@ export class MathEngine {
 
     const preset = this.state.preset;
     const lvl = this.state.playerLevel || 1;
-    const rangeCfg = getRangeConfig(preset, op);
+
+    // Use runtime custom ranges if preset is "custom" and customRanges exist in state
+    let rangeCfg;
+    if (preset === 'custom' && this.state.customRanges) {
+      rangeCfg = this.state.customRanges[op];
+    } else {
+      rangeCfg = getRangeConfig(preset, op);
+    }
 
     let a = 0, b = 0, answer = 0, symbol = '+';
     let tier = 1;
