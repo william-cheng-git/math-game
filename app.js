@@ -1,2933 +1,747 @@
 /**
- * Math Blast! 🚀 Kid-Friendly Arithmetic Game
- * -------------------------------------------------------------
- * Pure client-side JavaScript, zero backend required.
- * Fully compatible with GitHub Pages hosting.
+ * Math Blast! 🚀 — Main Application Orchestrator (ES Module)
+ *
+ * Bootstraps all modules, manages global state, handles view switching,
+ * and coordinates the game loop between modules.
  */
+import { DIFFICULTY_PRESETS, getRangeConfig, getOperationsForPreset, getPresetMeta } from './config.js';
+import { StorageManager } from './modules/storage.js';
+import { SoundFX } from './modules/sound.js';
+import { MathEngine } from './modules/math-engine.js';
+import { HomeView } from './modules/home.js';
+import { ConfigView } from './modules/config-view.js';
+import { GameView } from './modules/game-view.js';
+import { SummaryView } from './modules/summary-view.js';
+import { Charts } from './modules/charts.js';
+import { STAGE_DEFINITIONS, LEVEL_TITLES, MathBlastGame } from './games/math-blast/game.js';
 
-(function () {
-  'use strict';
-
-  /* ==========================================================================
-     1. CONSTANTS & CONFIGURATION
-     ========================================================================== */
-  const COOKIE_NAME = 'math_blast_save_data';
-  const LOCALSTORAGE_KEY = 'math_blast_save_data';
-  const MAX_COOKIE_HISTORY = 15; // Cookies have 4KB limit; store recent 15 in cookie, full in localStorage
-  const SOUND_STORAGE_KEY = 'math_blast_sound_enabled';
-
-  // Encouraging feedback messages
-  const CORRECT_PHRASES = [
-    { text: 'Awesome! 🌟', mascot: '🌟' },
-    { text: 'Super Fast! ⚡', mascot: '🚀' },
-    { text: 'Spot On! 🎯', mascot: '🎯' },
-    { text: 'Math Genius! 🧠', mascot: '💡' },
-    { text: 'Keep It Up! 🔥', mascot: '⭐' },
-    { text: 'Brilliant! ✨', mascot: '🎉' },
-    { text: 'You Rock! 🎸', mascot: '🌟' }
-  ];
-
-  const ENCOURAGING_TRY_AGAIN = [
-    { text: 'Nice try! Keep going! 💪', mascot: '🌱' },
-    { text: 'Almost had it! On to the next! 🚀', mascot: '⭐' },
-    { text: "Good effort! Practice makes perfect! 🌟", mascot: '🌟' },
-    { text: 'No worries! You got the next one! ✨', mascot: '🎯' }
-  ];
-
-  // Stage Adventure mode configurations (6 stages of ascending constant difficulty)
-  const STAGE_DEFINITIONS = [
-    {
-      stage: 1,
-      name: 'Starter Grove',
-      icon: '🌱',
-      desc: 'Single-digit + & − (Basic)',
-      ops: ['add', 'sub']
+/* ==========================================================================
+   GLOBAL STATE
+   ========================================================================== */
+const state = {
+  gameMode: 'stageAdventure',
+  currentStage: 1,
+  stageQuestionsTotal: 10,
+  stageQuestionIndex: 0,
+  currentLevel: 1,
+  levelQuestionsTotal: 20,
+  levelQuestionIndex: 0,
+  levelCorrectCount: 0,
+  levelMissedCount: 0,
+  preset: 'easy',
+  operations: ['add', 'sub'],
+  startingTime: 60,
+  currentQuestion: null,
+  questionNumber: 0,
+  currentInput: '',
+  score: 0,
+  streak: 0,
+  bestStreak: 0,
+  correctCount: 0,
+  missedCount: 0,
+  totalAnswered: 0,
+  bonusTimeEarned: 0,
+  timeLeft: 60,
+  timerInitial: 60,
+  isPlaying: false,
+  isPaused: false,
+  isSubmitting: false,
+  playerLevel: 1,
+  highestLevelReached: 1,
+  levelTitles: LEVEL_TITLES,
+  soundEnabled: true,
+  saveData: {
+    highScores: { easy: 0, medium: 0, hard: 0, custom: 0 },
+    bestAccuracy: { easy: 0, medium: 0, hard: 0, custom: 0 },
+    stageProgress: {
+      unlockedStage: 1,
+      stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+      bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
+      bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
     },
-    {
-      stage: 2,
-      name: 'Carrying Crossing',
-      icon: '⚡',
-      desc: 'Carrying, borrowing, 2×, 5×, 10×',
-      ops: ['add', 'sub', 'mul']
+    levelProgress: {
+      unlockedLevel: 1,
+      stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
     },
-    {
-      stage: 3,
-      name: 'Digit Mountain',
-      icon: '🚀',
-      desc: 'Double-digits, 3×-7×, simple ÷',
-      ops: ['add', 'sub', 'mul', 'div']
-    },
-    {
-      stage: 4,
-      name: 'Champion Fortress',
-      icon: '🏆',
-      desc: 'Multiplication to 12, division to 144',
-      ops: ['add', 'sub', 'mul', 'div']
-    },
-    {
-      stage: 5,
-      name: 'Wizard Peak',
-      icon: '💎',
-      desc: 'Advanced mental arithmetic',
-      ops: ['add', 'sub', 'mul', 'div']
-    },
-    {
-      stage: 6,
-      name: 'Mythic Realm',
-      icon: '👑',
-      desc: 'Grandmaster arithmetic mastery',
-      ops: ['add', 'sub', 'mul', 'div']
-    }
-  ];
+    history: []
+  },
+  STAGE_DEFINITIONS
+};
 
-  /* ==========================================================================
-     2. APP STATE
-     ========================================================================== */
-  const state = {
-    // Current setup
-    gameMode: 'stageAdventure', // 'stageAdventure', 'timeRush', or 'levelQuest'
-    currentStage: 1,
-    stageQuestionsTotal: 10,
-    stageQuestionIndex: 0,
-    currentLevel: 1,
-    levelQuestionsTotal: 20,
-    levelQuestionIndex: 0,
-    levelCorrectCount: 0,
-    levelMissedCount: 0,
-    preset: 'easy', // 'easy', 'medium', 'hard', 'custom'
-    operations: ['add', 'sub'], // 'add', 'sub', 'mul', 'div'
-    startingTime: 60,
+/* ==========================================================================
+   DOM ELEMENTS REFERENCE
+   ========================================================================== */
+const elements = {};
 
-    // Active gameplay
-    currentQuestion: null,
-    questionNumber: 0,
-    currentInput: '',
-    score: 0,
-    streak: 0,
-    bestStreak: 0,
-    correctCount: 0,
-    missedCount: 0,
-    totalAnswered: 0,
-    bonusTimeEarned: 0,
-    timeLeft: 60,
-    timerInitial: 60,
-    timerIntervalId: null,
-    isPlaying: false,
-    isPaused: false,
-    isSubmitting: false, // Prevents duplicate scoring on rapid Enter key or double clicks
-    lastTickTime: 0,
+/* ==========================================================================
+   MODULE INSTANCES
+   ========================================================================== */
+let storage, sound, mathEngine, homeView, configView, gameView, summaryView, charts, mathBlastGame;
 
-    // Level progression
-    playerLevel: 1,
-    highestLevelReached: 1,
-    levelTitles: [
-      '',
-      'Apprentice',
-      'Explorer',
-      'Adventurer',
-      'Champion',
-      'Master',
-      'Grandmaster',
-      'Mythic Hero',
-      'Legend'
-    ],
-    levelUpTimeoutId: null,
-    streakMilestoneTimeoutId: null,
 
-    // Sound
-    soundEnabled: true,
-    audioCtx: null,
+/* ==========================================================================
+   INITIALIZATION
+   ========================================================================== */
 
-    // Persistence
-    saveData: {
-      highScores: { easy: 0, medium: 0, hard: 0, custom: 0 },
-      bestAccuracy: { easy: 0, medium: 0, hard: 0, custom: 0 },
-      stageProgress: {
-        unlockedStage: 1,
-        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-      },
-      levelProgress: {
-        unlockedLevel: 1,
-        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-      },
-      history: []
-    },
+function init() {
+  _captureElements();
+  sound = new SoundFX(state);
+  mathEngine = new MathEngine(state);
+  mathBlastGame = new MathBlastGame(state);
+  charts = new Charts();
+  storage = new StorageManager(state, elements, {
+    updateStorageStatusUI: _updateStorageStatusUI,
+    updateBestRecordUI: _updateBestRecordUI,
+    renderStageGridUI: _renderStageGridUI,
+    renderHistoryModal: _renderHistoryModal
+  });
+  homeView = new HomeView(elements, sound, (gameId) => {},
+    () => { homeView.switchToConfig(); });
+  configView = new ConfigView(elements, sound, storage, mathEngine, { DIFFICULTY_PRESETS });
+  configView.setState(state);
+  configView.setOnStartGame(() => startGame());
+  gameView = new GameView(elements, sound, storage, mathEngine, state);
+  summaryView = new SummaryView(elements, sound, storage, state, charts);
+  storage.init();
+  _bindGlobalEvents();
+  homeView.init();
+  configView.init();
+  _applyPreset('easy');
+  _selectTimeDuration(60);
+  _switchScreen(elements.screenLanding);
+}
 
-    // Chart instances
-    accuracyChartInstance: null,
-    scoreTrendChartInstance: null,
-    accuracyTrendChartInstance: null
+/* ==========================================================================
+   SCREEN SWITCHING
+   ========================================================================== */
+
+function _switchScreen(screen) {
+  document.querySelectorAll('#main-content > section.screen').forEach(s => s.classList.remove('active'));
+  if (screen) screen.classList.add('active');
+}
+
+/* ==========================================================================
+   DOM ELEMENT CAPTURE (Part 1: screens, header, landing)
+   ========================================================================== */
+
+function _captureElements() {
+  const get = (id) => document.getElementById(id);
+  const getAll = (sel) => document.querySelectorAll(sel);
+
+  elements.screenLanding = get('screen-landing');
+  elements.screenConfig = get('screen-config');
+  elements.screenGame = get('screen-game');
+  elements.screenSummary = get('screen-summary');
+  elements.modalHistory = get('modal-history');
+  elements.modalConfirmClear = get('modal-confirm-clear');
+  elements.modalConfirmQuit = get('modal-confirm-quit');
+
+  elements.headerHomeBtn = get('header-home-btn');
+  elements.btnSoundToggle = get('btn-sound-toggle');
+  elements.soundIcon = get('sound-icon');
+  elements.btnOpenHistory = get('btn-open-history');
+
+  elements.gameCards = getAll('.landing-games-grid .game-card');
+  elements.btnPlaySelectedGame = get('btn-play-selected-game');
+
+  elements.modeBtnStage = get('mode-btn-stage');
+  elements.modeBtnTime = get('mode-btn-time');
+  elements.modeBtnLevelQuest = get('mode-btn-level-quest');
+  elements.presetCards = getAll('.preset-card');
+  elements.opCheckboxes = {
+    add: get('op-add'),
+    sub: get('op-sub'),
+    mul: get('op-mul'),
+    div: get('op-div')
   };
+  elements.timerChips = getAll('.timer-chip');
+  elements.customTimeInput = get('custom-time-input');
+  elements.configBestRecord = get('config-best-record');
+  elements.bestPresetName = get('best-preset-name');
+  elements.bestScoreVal = get('best-score-val');
+  elements.bestAccVal = get('best-acc-val');
+  elements.btnStartGame = get('btn-start-game');
+  elements.stageCards = getAll('.stage-grid .stage-card');
+  elements.levelCards = getAll('.level-grid .level-card');
 
-  /* ==========================================================================
-     3. DOM ELEMENTS
-     ========================================================================== */
-  const elements = {
-    // Screens
-    screenLanding: document.getElementById('screen-landing'),
-    screenConfig: document.getElementById('screen-config'),
-    screenGame: document.getElementById('screen-game'),
-    screenSummary: document.getElementById('screen-summary'),
-    modalHistory: document.getElementById('modal-history'),
-    modalConfirmClear: document.getElementById('modal-confirm-clear'),
-    modalConfirmQuit: document.getElementById('modal-confirm-quit'),
+/* ==========================================================================
+   DOM ELEMENT CAPTURE (Part 2: gameplay HUD)
+   ========================================================================== */
 
-    // Global Header
-    headerHomeBtn: document.getElementById('header-home-btn'),
-    btnSoundToggle: document.getElementById('btn-sound-toggle'),
-    soundIcon: document.getElementById('sound-icon'),
-    btnOpenHistory: document.getElementById('btn-open-history'),
+(function _captureHUD() {
+  elements.hudLevelCard = document.getElementById('hud-level-card');
+  elements.hudLevel = document.getElementById('hud-level');
+  elements.levelBarFill = document.getElementById('level-bar-fill');
+  elements.hudStageCard = document.getElementById('hud-stage-card');
+  elements.hudStageNum = document.getElementById('hud-stage-num');
+  elements.hudStageName = document.getElementById('hud-stage-name');
+  elements.hudStageProgressCard = document.getElementById('hud-stage-progress-card');
+  elements.hudStageProgress = document.getElementById('hud-stage-progress');
+  elements.stageProgressFill = document.getElementById('stage-progress-fill');
+  elements.hudScore = document.getElementById('hud-score');
+  elements.scorePopup = document.getElementById('score-popup');
+  elements.hudTimer = document.getElementById('hud-timer');
+  elements.hudTimerContainer = document.getElementById('hud-timer-container');
+  elements.timerBarFill = document.getElementById('timer-bar-fill');
+  elements.bonusTimePopup = document.getElementById('bonus-time-popup');
+  elements.hudStreak = document.getElementById('hud-streak');
+  elements.hudMultiplier = document.getElementById('hud-multiplier');
+  elements.btnQuitGame = document.getElementById('btn-quit-game');
+})();
 
-    // Mode Selection & Stage Panels
-    modeBtnStage: document.getElementById('mode-btn-stage'),
-    modeBtnTime: document.getElementById('mode-btn-time'),
-    modeBtnLevelQuest: document.getElementById('mode-btn-level-quest'),
-    panelStageAdventure: document.getElementById('panel-stage-adventure'),
-    panelTimeRush: document.getElementById('panel-time-rush'),
-    panelLevelQuest: document.getElementById('panel-level-quest'),
-    stageCards: document.querySelectorAll('.stage-grid .stage-card'),
-    levelCards: document.querySelectorAll('.level-grid .level-card'),
+/* ==========================================================================
+   DOM ELEMENT CAPTURE (Part 3: gameplay question/feedback/keypad)
+   ========================================================================== */
 
-    // Landing Page
-    gameCards: document.querySelectorAll('.landing-games-grid .game-card'),
-    btnPlaySelectedGame: document.getElementById('btn-play-selected-game'),
-    selectedGame: 'math-blast',
+(function _captureGameplay() {
+  elements.levelUpBanner = document.getElementById('level-up-banner');
+  elements.levelUpTitle = document.getElementById('level-up-title');
+  elements.levelUpDesc = document.getElementById('level-up-desc');
+  elements.levelUpBadge = document.getElementById('level-up-badge');
+  elements.streakAchievementBanner = document.getElementById('streak-achievement-banner');
+  elements.streakAchievementIcon = document.getElementById('streak-achievement-icon');
+  elements.streakAchievementKicker = document.getElementById('streak-achievement-kicker');
+  elements.streakAchievementTitle = document.getElementById('streak-achievement-title');
+  elements.streakAchievementDesc = document.getElementById('streak-achievement-desc');
+  elements.streakAchievementBonus = document.getElementById('streak-achievement-bonus');
 
-    // Config Screen
-    presetCards: document.querySelectorAll('.preset-card'),
-    opCheckboxes: {
-      add: document.getElementById('op-add'),
-      sub: document.getElementById('op-sub'),
-      mul: document.getElementById('op-mul'),
-      div: document.getElementById('op-div')
-    },
-    timerChips: document.querySelectorAll('.timer-chip'),
-    customTimeInput: document.getElementById('custom-time-input'),
-    configBestRecord: document.getElementById('config-best-record'),
-    bestPresetName: document.getElementById('best-preset-name'),
-    bestScoreVal: document.getElementById('best-score-val'),
-    bestAccVal: document.getElementById('best-acc-val'),
-    btnStartGame: document.getElementById('btn-start-game'),
+  elements.questionTierBadge = document.getElementById('question-tier-badge');
+  elements.questionCounter = document.getElementById('question-counter');
+  elements.termA = document.getElementById('term-a');
+  elements.termOp = document.getElementById('term-op');
+  elements.termB = document.getElementById('term-b');
+  elements.userAnswerBox = document.getElementById('user-answer-box');
+  elements.answerText = document.getElementById('answer-text');
+  elements.feedbackBanner = document.getElementById('feedback-banner');
+  elements.feedbackMascot = document.getElementById('feedback-mascot');
+  elements.feedbackMsg = document.getElementById('feedback-msg');
 
-    // Gameplay Screen HUD
-    hudLevelCard: document.getElementById('hud-level-card'),
-    hudLevel: document.getElementById('hud-level'),
-    levelBarFill: document.getElementById('level-bar-fill'),
-    hudStageCard: document.getElementById('hud-stage-card'),
-    hudStageNum: document.getElementById('hud-stage-num'),
-    hudStageName: document.getElementById('hud-stage-name'),
-    hudStageProgressCard: document.getElementById('hud-stage-progress-card'),
-    hudStageProgress: document.getElementById('hud-stage-progress'),
-    stageProgressFill: document.getElementById('stage-progress-fill'),
-    hudScore: document.getElementById('hud-score'),
-    scorePopup: document.getElementById('score-popup'),
-    hudTimer: document.getElementById('hud-timer'),
-    hudTimerContainer: document.getElementById('hud-timer-container'),
-    timerBarFill: document.getElementById('timer-bar-fill'),
-    bonusTimePopup: document.getElementById('bonus-time-popup'),
-    hudStreak: document.getElementById('hud-streak'),
-    hudMultiplier: document.getElementById('hud-multiplier'),
-    btnQuitGame: document.getElementById('btn-quit-game'),
+  elements.keypadBtns = document.querySelectorAll('.key-btn[data-key]');
+  elements.keyClear = document.querySelector('.key-clear');
+  elements.keyBackspace = document.querySelector('.key-backspace');
+  elements.btnSkipQuestion = document.getElementById('btn-skip-question');
+  elements.btnSubmitAnswer = document.getElementById('btn-submit-answer');
+})();
 
-    // Level Quest HUD (untimed mode)
-    hudLevelCardLQ: document.getElementById('hud-level-card'),
+elements.storageStatusText = document.getElementById('storage-status-text');
 
-    // Level Quest Result Overlay
-    levelResultOverlay: document.getElementById('level-result-overlay'),
-    levelResultMascot: document.getElementById('level-result-mascot'),
-    levelResultTitle: document.getElementById('level-result-title'),
-    levelResultAccuracy: document.getElementById('level-result-accuracy'),
-    levelResultCorrect: document.getElementById('level-result-correct'),
-    levelResultLevel: document.getElementById('level-result-level'),
-    levelResultMessage: document.getElementById('level-result-message'),
-    levelResultChartCanvas: document.getElementById('levelResultChart'),
-    levelResultSvgFallback: document.getElementById('level-result-svg-fallback'),
-    btnLevelNext: document.getElementById('btn-level-next'),
-    btnLevelNextText: document.getElementById('btn-level-next-text'),
-    btnLevelRetry: document.getElementById('btn-level-retry'),
-    btnLevelRetryText: document.getElementById('btn-level-retry-text'),
-    btnLevelQuit: document.getElementById('btn-level-quit'),
+/* ==========================================================================
+   DOM ELEMENT CAPTURE (Part 4: summary screen)
+   ========================================================================== */
 
-    // Achievement Banners
-    levelUpBanner: document.getElementById('level-up-banner'),
-    levelUpTitle: document.getElementById('level-up-title'),
-    levelUpDesc: document.getElementById('level-up-desc'),
-    levelUpBadge: document.getElementById('level-up-badge'),
-    streakAchievementBanner: document.getElementById('streak-achievement-banner'),
-    streakAchievementIcon: document.getElementById('streak-achievement-icon'),
-    streakAchievementKicker: document.getElementById('streak-achievement-kicker'),
-    streakAchievementTitle: document.getElementById('streak-achievement-title'),
-    streakAchievementDesc: document.getElementById('streak-achievement-desc'),
-    streakAchievementBonus: document.getElementById('streak-achievement-bonus'),
+(function _captureSummary() {
+  elements.highScoreBanner = document.getElementById('high-score-banner');
+  elements.stageResultBanner = document.getElementById('stage-result-banner');
+  elements.stageResultIcon = document.getElementById('stage-result-icon');
+  elements.stageResultTitle = document.getElementById('stage-result-title');
+  elements.stageResultSub = document.getElementById('stage-result-sub');
+  elements.stageStarsDisplay = document.getElementById('stage-stars-display');
+  elements.summaryMascot = document.getElementById('summary-mascot');
+  elements.summaryTitle = document.getElementById('summary-heading');
+  elements.summaryCompliment = document.getElementById('summary-compliment');
+  elements.summaryScore = document.getElementById('summary-score');
+  elements.summaryLevel = document.getElementById('summary-level');
+  elements.summaryAccuracy = document.getElementById('summary-accuracy');
+  elements.summaryCorrect = document.getElementById('summary-correct');
+  elements.summaryMissed = document.getElementById('summary-missed');
+  elements.summaryStreak = document.getElementById('summary-streak');
+  elements.summaryBonusEarned = document.getElementById('summary-bonus-earned');
+  elements.accuracyChartCanvas = document.getElementById('accuracyChart');
+  elements.accuracySvgFallback = document.getElementById('accuracy-svg-fallback');
+  elements.legendCorrectPct = document.getElementById('legend-correct-pct');
+  elements.legendMissedPct = document.getElementById('legend-missed-pct');
+  elements.btnNextStage = document.getElementById('btn-next-stage');
+  elements.btnNextStageText = document.getElementById('btn-next-stage-text');
+  elements.btnPlayAgain = document.getElementById('btn-play-again');
+  elements.btnPlayAgainText = document.getElementById('btn-play-again-text');
+  elements.btnChangeSettings = document.getElementById('btn-change-settings');
+  elements.btnChangeSettingsText = document.getElementById('btn-change-settings-text');
+  elements.btnSummaryHistory = document.getElementById('btn-summary-history');
+})();
 
-    questionTierBadge: document.getElementById('question-tier-badge'),
-    questionCounter: document.getElementById('question-counter'),
-    termA: document.getElementById('term-a'),
-    termOp: document.getElementById('term-op'),
-    termB: document.getElementById('term-b'),
-    userAnswerBox: document.getElementById('user-answer-box'),
-    answerText: document.getElementById('answer-text'),
-    feedbackBanner: document.getElementById('feedback-banner'),
-    feedbackMascot: document.getElementById('feedback-mascot'),
-    feedbackMsg: document.getElementById('feedback-msg'),
+/* ==========================================================================
+   DOM ELEMENT CAPTURE (Part 5: history modal + confirm modals)
+   ========================================================================== */
 
-    keypadBtns: document.querySelectorAll('.key-btn[data-key]'),
-    keyClear: document.querySelector('.key-clear'),
-    keyBackspace: document.querySelector('.key-backspace'),
-    btnSkipQuestion: document.getElementById('btn-skip-question'),
-    btnSubmitAnswer: document.getElementById('btn-submit-answer'),
+(function _captureModals() {
+  elements.btnCloseHistory = document.getElementById('btn-close-history');
+  elements.histTotalGames = document.getElementById('hist-total-games');
+  elements.histBestScore = document.getElementById('hist-best-score');
+  elements.histAvgAccuracy = document.getElementById('hist-avg-accuracy');
+  elements.tabScoreTrend = document.getElementById('tab-score-trend');
+  elements.tabAccuracyTrend = document.getElementById('tab-accuracy-trend');
+  elements.viewScoreTrend = document.getElementById('view-score-trend');
+  elements.viewAccuracyTrend = document.getElementById('view-accuracy-trend');
+  elements.scoreTrendCanvas = document.getElementById('scoreTrendChart');
+  elements.scoreTrendSvgFallback = document.getElementById('score-trend-svg-fallback');
+  elements.accuracyTrendCanvas = document.getElementById('accuracyTrendChart');
+  elements.accTrendSvgFallback = document.getElementById('acc-trend-svg-fallback');
+  elements.historyTbody = document.getElementById('history-tbody');
+  elements.btnClearHistory = document.getElementById('btn-clear-history');
 
-    // Summary Screen
-    highScoreBanner: document.getElementById('high-score-banner'),
-    stageResultBanner: document.getElementById('stage-result-banner'),
-    stageResultIcon: document.getElementById('stage-result-icon'),
-    stageResultTitle: document.getElementById('stage-result-title'),
-    stageResultSub: document.getElementById('stage-result-sub'),
-    stageStarsDisplay: document.getElementById('stage-stars-display'),
-    summaryMascot: document.getElementById('summary-mascot'),
-    summaryTitle: document.getElementById('summary-heading'),
-    summaryCompliment: document.getElementById('summary-compliment'),
-    summaryScore: document.getElementById('summary-score'),
-    summaryLevel: document.getElementById('summary-level'),
-    summaryAccuracy: document.getElementById('summary-accuracy'),
-    summaryCorrect: document.getElementById('summary-correct'),
-    summaryMissed: document.getElementById('summary-missed'),
-    summaryStreak: document.getElementById('summary-streak'),
-    summaryBonusEarned: document.getElementById('summary-bonus-earned'),
-    accuracyChartCanvas: document.getElementById('accuracyChart'),
-    accuracySvgFallback: document.getElementById('accuracy-svg-fallback'),
-    legendCorrectPct: document.getElementById('legend-correct-pct'),
-    legendMissedPct: document.getElementById('legend-missed-pct'),
-    btnNextStage: document.getElementById('btn-next-stage'),
-    btnNextStageText: document.getElementById('btn-next-stage-text'),
-    btnPlayAgain: document.getElementById('btn-play-again'),
-    btnPlayAgainText: document.getElementById('btn-play-again-text'),
-    btnChangeSettings: document.getElementById('btn-change-settings'),
-    btnChangeSettingsText: document.getElementById('btn-change-settings-text'),
-    btnSummaryHistory: document.getElementById('btn-summary-history'),
+  elements.btnCancelClear = document.getElementById('btn-cancel-clear');
+  elements.btnConfirmClear = document.getElementById('btn-confirm-clear');
+  elements.btnResumeGame = document.getElementById('btn-resume-game');
+  elements.btnReallyQuit = document.getElementById('btn-really-quit');
+})();
 
-    // History Modal
-    btnCloseHistory: document.getElementById('btn-close-history'),
-    histTotalGames: document.getElementById('hist-total-games'),
-    histBestScore: document.getElementById('hist-best-score'),
-    histAvgAccuracy: document.getElementById('hist-avg-accuracy'),
-    tabScoreTrend: document.getElementById('tab-score-trend'),
-    tabAccuracyTrend: document.getElementById('tab-accuracy-trend'),
-    viewScoreTrend: document.getElementById('view-score-trend'),
-    viewAccuracyTrend: document.getElementById('view-accuracy-trend'),
-    scoreTrendCanvas: document.getElementById('scoreTrendChart'),
-    scoreTrendSvgFallback: document.getElementById('score-trend-svg-fallback'),
-    accuracyTrendCanvas: document.getElementById('accuracyTrendChart'),
-    accTrendSvgFallback: document.getElementById('acc-trend-svg-fallback'),
-    historyTbody: document.getElementById('history-tbody'),
-    storageStatusText: document.getElementById('storage-status-text'),
-    btnClearHistory: document.getElementById('btn-clear-history'),
+/* ==========================================================================
+   HELPER: Preset & Time
+   ========================================================================== */
 
-    // Modals confirm
-    btnCancelClear: document.getElementById('btn-cancel-clear'),
-    btnConfirmClear: document.getElementById('btn-confirm-clear'),
-    btnResumeGame: document.getElementById('btn-resume-game'),
-    btnReallyQuit: document.getElementById('btn-really-quit')
-  };
+function _applyPreset(preset) {
+  state.preset = preset;
+  const cards = elements.presetCards;
+  cards.forEach(c => {
+    const active = c.dataset.preset === preset;
+    c.classList.toggle('active', active);
+    c.setAttribute('aria-checked', String(active));
+  });
+  if (storage.updateBestRecordUI) storage.updateBestRecordUI();
+}
 
-  /* ==========================================================================
-     4. STORAGE: COOKIE & LOCALSTORAGE ENGINE
-     ========================================================================== */
-  const StorageManager = {
-    init() {
-      // Load sound setting
-      const soundSetting = localStorage.getItem(SOUND_STORAGE_KEY);
-      if (soundSetting !== null) {
-        state.soundEnabled = soundSetting === 'true';
-      }
-      this.updateSoundUI();
+function _selectTimeDuration(seconds) {
+  state.startingTime = seconds;
+  state.timeLeft = seconds;
+  state.timerInitial = seconds;
+  elements.timerChips.forEach(chip => {
+    chip.classList.toggle('active', parseInt(chip.dataset.time, 10) === seconds);
+  });
+}
 
-      // Load game records from Cookie or LocalStorage
-      this.loadData();
-    },
+/* ==========================================================================
+   HELPER: UI updates
+   ========================================================================== */
 
-    updateSoundUI() {
-      if (state.soundEnabled) {
-        elements.soundIcon.textContent = '🔊';
-        elements.btnSoundToggle.classList.remove('muted');
-        elements.btnSoundToggle.title = 'Sound Effects: ON (Click to Mute)';
-      } else {
-        elements.soundIcon.textContent = '🔇';
-        elements.btnSoundToggle.classList.add('muted');
-        elements.btnSoundToggle.title = 'Sound Effects: MUTED (Click to Unmute)';
-      }
-    },
+function _updateStorageStatusUI(source) {
+  const el = elements.storageStatusText;
+  if (!el) return;
+  el.textContent = source === 'cleared' ? 'History has been reset.' : 'Saved securely in browser cookies & localStorage';
+}
 
-    toggleSound() {
-      state.soundEnabled = !state.soundEnabled;
-      try {
-        localStorage.setItem(SOUND_STORAGE_KEY, String(state.soundEnabled));
-      } catch (e) {
-        console.warn('LocalStorage error saving sound preference', e);
-      }
-      this.updateSoundUI();
-      if (state.soundEnabled) {
-        SoundFX.playTap();
-      }
-    },
+function _updateBestRecordUI() {
+  const preset = state.preset;
+  const bestScore = state.saveData.highScores[preset] || 0;
+  const bestAcc = state.saveData.bestAccuracy[preset] || 0;
+  const names = { easy: 'Easy', medium: 'Medium', hard: 'Hard', custom: 'Custom' };
+  if (elements.bestPresetName) elements.bestPresetName.textContent = names[preset] || 'Mode';
+  if (elements.bestScoreVal) elements.bestScoreVal.textContent = `${bestScore} pts`;
+  if (elements.bestAccVal) elements.bestAccVal.textContent = `${bestAcc}%`;
+}
 
-    getCookie(name) {
-      try {
-        const matches = document.cookie.match(new RegExp(
-          '(?:^|; )' + name.replace(/([\.$?*|{}\(\)\[\]\\\/\+^])/g, '\\$1') + '=([^;]*)'
-        ));
-        return matches ? decodeURIComponent(matches[1]) : undefined;
-      } catch (e) {
-        console.warn('Cookie reading unavailable', e);
-        return undefined;
-      }
-    },
-
-    setCookie(name, value, days = 365) {
-      try {
-        const expires = new Date(Date.now() + days * 864e5).toUTCString();
-        document.cookie = `${name}=${encodeURIComponent(value)}; expires=${expires}; path=/; SameSite=Lax`;
-        return true;
-      } catch (e) {
-        console.warn('Cookie write failed', e);
-        return false;
-      }
-    },
-
-    deleteCookie(name) {
-      try {
-        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax`;
-      } catch (e) {
-        console.warn('Cookie delete failed', e);
-      }
-    },
-
-    loadData() {
-      let rawData = null;
-      let loadedFrom = '';
-
-      // 1. Try Cookie first
-      const cookieStr = this.getCookie(COOKIE_NAME);
-      if (cookieStr) {
-        try {
-          rawData = JSON.parse(cookieStr);
-          loadedFrom = 'cookies';
-        } catch (e) {
-          console.warn('Error parsing cookie JSON', e);
-        }
-      }
-
-      // 2. Fallback to LocalStorage
-      if (!rawData) {
-        try {
-          const localStr = localStorage.getItem(LOCALSTORAGE_KEY);
-          if (localStr) {
-            rawData = JSON.parse(localStr);
-            loadedFrom = 'localStorage';
-          }
-        } catch (e) {
-          console.warn('Error reading localStorage', e);
-        }
-      }
-
-      // If data exists, merge into state
-      const defaultStageProgress = {
-        unlockedStage: 1,
-        stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-        bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-        bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-      };
-
-      if (rawData && typeof rawData === 'object') {
-        const rawStage = (rawData.stageProgress && typeof rawData.stageProgress === 'object') ? rawData.stageProgress : {};
-        state.saveData = {
-          highScores: Object.assign({ easy: 0, medium: 0, hard: 0, custom: 0 }, rawData.highScores),
-          bestAccuracy: Object.assign({ easy: 0, medium: 0, hard: 0, custom: 0 }, rawData.bestAccuracy),
-          stageProgress: {
-            unlockedStage: Math.max(1, parseInt(rawStage.unlockedStage, 10) || 1),
-            stars: Object.assign({}, defaultStageProgress.stars, rawStage.stars),
-            bestAccuracy: Object.assign({}, defaultStageProgress.bestAccuracy, rawStage.bestAccuracy),
-            bestScore: Object.assign({}, defaultStageProgress.bestScore, rawStage.bestScore)
-          },
-          history: Array.isArray(rawData.history) ? rawData.history : []
-        };
-      }
-
-      this.updateStorageStatusUI(loadedFrom);
-      this.updateBestRecordUI();
-      renderStageGridUI();
-    },
-
-    saveData() {
-      const fullJson = JSON.stringify(state.saveData);
-
-      // Save to localStorage (full history)
-      try {
-        localStorage.setItem(LOCALSTORAGE_KEY, fullJson);
-      } catch (e) {
-        console.warn('LocalStorage save failed', e);
-      }
-
-      // Save trimmed copy to cookies to respect 4KB cookie limit
-      const cookieData = {
-        highScores: state.saveData.highScores,
-        bestAccuracy: state.saveData.bestAccuracy,
-        stageProgress: state.saveData.stageProgress,
-        history: state.saveData.history.slice(-MAX_COOKIE_HISTORY)
-      };
-      const cookieJson = JSON.stringify(cookieData);
-      const cookieSuccess = this.setCookie(COOKIE_NAME, cookieJson);
-
-      this.updateStorageStatusUI(cookieSuccess ? 'cookies & localStorage' : 'localStorage fallback');
-      this.updateBestRecordUI();
-      renderStageGridUI();
-    },
-
-    clearAll() {
-      this.deleteCookie(COOKIE_NAME);
-      try {
-        localStorage.removeItem(LOCALSTORAGE_KEY);
-      } catch (e) {}
-
-      state.saveData = {
-        highScores: { easy: 0, medium: 0, hard: 0, custom: 0 },
-        bestAccuracy: { easy: 0, medium: 0, hard: 0, custom: 0 },
-        stageProgress: {
-          unlockedStage: 1,
-          stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-          bestAccuracy: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 },
-          bestScore: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }
-        },
-        history: []
-      };
-
-      this.updateStorageStatusUI('cleared');
-      this.updateBestRecordUI();
-      renderStageGridUI();
-      renderHistoryModal();
-    },
-
-    updateStorageStatusUI(source) {
-      if (elements.storageStatusText) {
-        if (source === 'cleared') {
-          elements.storageStatusText.textContent = 'History has been reset.';
-        } else {
-          elements.storageStatusText.textContent = 'Saved securely in browser cookies & localStorage';
-        }
-      }
-    },
-
-    updateBestRecordUI() {
-      const preset = state.preset;
-      const bestScore = state.saveData.highScores[preset] || 0;
-      const bestAcc = state.saveData.bestAccuracy[preset] || 0;
-
-      const presetNames = {
-        easy: 'Easy',
-        medium: 'Medium',
-        hard: 'Hard',
-        custom: 'Custom'
-      };
-
-      if (elements.bestPresetName) elements.bestPresetName.textContent = presetNames[preset] || 'Mode';
-      if (elements.bestScoreVal) elements.bestScoreVal.textContent = `${bestScore} pts`;
-      if (elements.bestAccVal) elements.bestAccVal.textContent = `${bestAcc}%`;
-    }
-  };
-
-  /* ==========================================================================
-     4b. STAGE GRID UI CONTROLLER
-     ========================================================================== */
-  function renderStageGridUI() {
-    const unlocked = (state.saveData && state.saveData.stageProgress && state.saveData.stageProgress.unlockedStage) || 1;
-    const stageStars = (state.saveData && state.saveData.stageProgress && state.saveData.stageProgress.stars) || {};
-
-    if (!elements.stageCards || elements.stageCards.length === 0) return;
-
-    elements.stageCards.forEach(card => {
-      const stageNum = parseInt(card.dataset.stage, 10);
-      const starsEl = document.getElementById(`stage-stars-${stageNum}`);
-      const isUnlocked = stageNum <= unlocked;
-      const isActive = stageNum === state.currentStage;
-
-      card.classList.toggle('locked', !isUnlocked);
-      card.classList.toggle('active', isActive && isUnlocked);
-      card.setAttribute('aria-checked', String(isActive && isUnlocked));
-      card.setAttribute('aria-disabled', String(!isUnlocked));
-
-      if (starsEl) {
-        if (!isUnlocked) {
-          starsEl.textContent = '🔒 Locked';
-        } else {
-          const starsCount = stageStars[stageNum] || 0;
-          if (starsCount === 3) starsEl.textContent = '⭐⭐⭐';
-          else if (starsCount === 2) starsEl.textContent = '⭐⭐☆';
-          else if (starsCount === 1) starsEl.textContent = '⭐☆☆';
-          else starsEl.textContent = '☆☆☆';
-        }
-      }
-    });
-
-    // Update start button label when in stage adventure mode
-    if (elements.btnStartGame) {
-      const startCaption = elements.btnStartGame.querySelector('.btn-caption');
-      if (startCaption) {
-        if (state.gameMode === 'stageAdventure') {
-          startCaption.textContent = `START STAGE ${state.currentStage} 🚀`;
-        } else {
-          startCaption.textContent = 'START GAME';
-        }
+function _renderStageGridUI() {
+  const unlocked = state.saveData.stageProgress.unlockedStage || 1;
+  const stars = state.saveData.stageProgress.stars || {};
+  if (!elements.stageCards || elements.stageCards.length === 0) return;
+  elements.stageCards.forEach(card => {
+    const stageNum = parseInt(card.dataset.stage, 10);
+    const starsEl = document.getElementById(`stage-stars-${stageNum}`);
+    const isUnlocked = stageNum <= unlocked;
+    const isActive = stageNum === state.currentStage;
+    card.classList.toggle('locked', !isUnlocked);
+    card.classList.toggle('active', isActive && isUnlocked);
+    card.setAttribute('aria-checked', String(isActive && isUnlocked));
+    card.setAttribute('aria-disabled', String(!isUnlocked));
+    if (starsEl) {
+      if (!isUnlocked) starsEl.textContent = '🔒 Locked';
+      else {
+        const sc = stars[stageNum] || 0;
+        starsEl.textContent = sc === 3 ? '⭐⭐⭐' : sc === 2 ? '⭐⭐☆' : sc === 1 ? '⭐☆☆' : '☆☆☆';
       }
     }
+  });
+  if (elements.btnStartGame) {
+    const cap = elements.btnStartGame.querySelector('.btn-caption');
+    if (cap) cap.textContent = state.gameMode === 'stageAdventure'
+      ? `START STAGE ${state.currentStage} 🚀` : 'START GAME';
   }
-
-  /* ==========================================================================
-     5. SOUND SYNTHESIS ENGINE (Web Audio API)
-     Zero external audio dependencies, works 100% offline without CORS/HTTP errors.
-     ========================================================================== */
-  const SoundFX = {
-    getAudioContext() {
-      if (!state.audioCtx) {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          state.audioCtx = new AudioContextClass();
-        }
-      }
-      if (state.audioCtx && state.audioCtx.state === 'suspended') {
-        state.audioCtx.resume();
-      }
-      return state.audioCtx;
-    },
-
-    playTone(freq, type = 'sine', duration = 0.15, gainVal = 0.2, startTimeOffset = 0) {
-      if (!state.soundEnabled) return;
-      const ctx = this.getAudioContext();
-      if (!ctx) return;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, ctx.currentTime + startTimeOffset);
-
-      gain.gain.setValueAtTime(gainVal, ctx.currentTime + startTimeOffset);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startTimeOffset + duration);
-
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(ctx.currentTime + startTimeOffset);
-      osc.stop(ctx.currentTime + startTimeOffset + duration);
-    },
-
-    playTap() {
-      this.playTone(520, 'sine', 0.05, 0.12);
-    },
-
-    playCorrect(tier = 1) {
-      if (!state.soundEnabled) return;
-      // Cheerful upward arpeggio
-      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-      notes.forEach((freq, idx) => {
-        this.playTone(freq, 'triangle', 0.16, 0.22, idx * 0.06);
-      });
-
-      // Extra sparkle for higher tier bonus problems
-      if (tier >= 3) {
-        setTimeout(() => {
-          this.playTone(1318.51, 'sine', 0.25, 0.2, 0); // E6
-          this.playTone(1567.98, 'sine', 0.35, 0.25, 0.08); // G6
-        }, 180);
-      }
-    },
-
-    playBonusTime() {
-      if (!state.soundEnabled) return;
-      // Sparkly time power-up chime
-      const freqs = [880, 1108.73, 1318.51, 1760];
-      freqs.forEach((f, i) => {
-        this.playTone(f, 'sine', 0.18, 0.18, i * 0.05);
-      });
-    },
-
-    playIncorrect() {
-      if (!state.soundEnabled) return;
-      // Soft encouraging wobble - not a harsh buzz!
-      this.playTone(329.63, 'sine', 0.14, 0.18, 0); // E4
-      this.playTone(293.66, 'sine', 0.22, 0.16, 0.1); // D4
-    },
-
-    playStreak() {
-      if (!state.soundEnabled) return;
-      // High streak fanfare
-      const freqs = [587.33, 739.99, 880, 1174.66];
-      freqs.forEach((f, i) => {
-        this.playTone(f, 'triangle', 0.2, 0.25, i * 0.08);
-      });
-    },
-
-    playLevelUp() {
-      if (!state.soundEnabled) return;
-      // Majestic ascending chime: C5, E5, G5, C6, E6 + high sparkle
-      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
-      notes.forEach((freq, idx) => {
-        this.playTone(freq, 'triangle', 0.26, 0.26, idx * 0.08);
-      });
-      setTimeout(() => {
-        this.playTone(1567.98, 'sine', 0.42, 0.22, 0); // G6 shimmer
-      }, 420);
-    },
-
-    playStreakMilestone(milestone) {
-      if (!state.soundEnabled) return;
-      if (milestone >= 50) {
-        // Godlike fanfare
-        const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
-        notes.forEach((freq, idx) => {
-          this.playTone(freq, 'triangle', 0.28, 0.28, idx * 0.07);
-        });
-      } else {
-        // High-energy victory arpeggio
-        const notes = [587.33, 739.99, 880, 1174.66, 1479.98];
-        notes.forEach((freq, idx) => {
-          this.playTone(freq, 'triangle', 0.22, 0.25, idx * 0.07);
-        });
-      }
-    },
-
-    playHighScoreFanfare() {
-      if (!state.soundEnabled) return;
-      // Triumphant victory fanfare melody
-      const melody = [
-        { f: 523.25, d: 0.12, t: 0.0 },
-        { f: 659.25, d: 0.12, t: 0.12 },
-        { f: 783.99, d: 0.14, t: 0.24 },
-        { f: 1046.50, d: 0.35, t: 0.38 },
-        { f: 880.00, d: 0.14, t: 0.75 },
-        { f: 1046.50, d: 0.55, t: 0.90 }
-      ];
-      melody.forEach(note => {
-        this.playTone(note.f, 'triangle', note.d, 0.3, note.t);
-      });
-    },
-
-    playTimerTick() {
-      if (!state.soundEnabled) return;
-      this.playTone(800, 'sine', 0.04, 0.08);
-    },
-
-    playRoundOver() {
-      if (!state.soundEnabled) return;
-      this.playTone(659.25, 'triangle', 0.2, 0.2, 0);
-      this.playTone(523.25, 'triangle', 0.4, 0.25, 0.15);
-    },
-
-    playFailure() {
-      if (!state.soundEnabled) return;
-      // Sad descending wobble - gentle, not harsh
-      this.playTone(349.23, 'sine', 0.3, 0.2, 0);  // F4
-      this.playTone(329.63, 'sine', 0.3, 0.18, 0.15); // E4
-      this.playTone(293.66, 'sine', 0.5, 0.16, 0.3);  // D4
-    },
-
-    playCongrats() {
-      if (!state.soundEnabled) return;
-      // Triumphant arpeggio: C5 E5 G5 C6 E6 G6
-      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
-      notes.forEach((freq, idx) => {
-        this.playTone(freq, 'triangle', 0.24, 0.26, idx * 0.07);
-      });
-      setTimeout(() => {
-        this.playTone(2093.00, 'sine', 0.5, 0.22, 0); // C7 shimmer
-      }, 450);
-    }
-  };
-
-  /* ==========================================================================
-     6. ARITHMETIC QUESTION GENERATOR & DIFFICULTY TIERS
-     ========================================================================== */
-  const MathEngine = {
-    randomInt(min, max) {
-      return Math.floor(Math.random() * (max - min + 1)) + min;
-    },
-
-    /**
-     * Generates questions for Stage Adventure mode.
-     * Within the same stage, the difficulty is ALWAYS constant!
-     */
-    generateStageQuestion(stageNum) {
-      const stageDef = STAGE_DEFINITIONS.find(d => d.stage === stageNum) || STAGE_DEFINITIONS[0];
-
-      // Available operations: default stage operations
-      let availableOps = stageDef.ops.slice();
-      if (state.operations && state.operations.length > 0) {
-        const intersection = stageDef.ops.filter(op => state.operations.includes(op));
-        if (intersection.length > 0) {
-          availableOps = intersection;
-        }
-      }
-      const op = availableOps[Math.floor(Math.random() * availableOps.length)];
-
-      let a = 0;
-      let b = 0;
-      let answer = 0;
-      let symbol = '+';
-      let tier = stageNum;
-      let tierName = `Stage ${stageNum}: ${stageDef.name}`;
-      let bonusSeconds = Math.min(5, stageNum);
-      let basePoints = stageNum * 15;
-
-      if (op === 'add') {
-        symbol = '+';
-        if (stageNum === 1) {
-          // Stage 1: Single digits, basic starter (sum <= 12)
-          a = this.randomInt(1, 6);
-          b = this.randomInt(1, 5);
-        } else if (stageNum === 2) {
-          // Stage 2: Carrying into teens/20s
-          a = this.randomInt(5, 16);
-          b = this.randomInt(4, 9);
-        } else if (stageNum === 3) {
-          // Stage 3: Double digits up to 50
-          a = this.randomInt(15, 38);
-          b = this.randomInt(12, 30);
-        } else if (stageNum === 4) {
-          // Stage 4: Numbers up to 100
-          a = this.randomInt(30, 75);
-          b = this.randomInt(25, 65);
-        } else if (stageNum === 5) {
-          // Stage 5: Advanced mental arithmetic
-          a = this.randomInt(55, 125);
-          b = this.randomInt(45, 95);
-        } else {
-          // Stage 6: Mythic arithmetic
-          a = this.randomInt(90, 250);
-          b = this.randomInt(70, 200);
-        }
-        answer = a + b;
-      } else if (op === 'sub') {
-        symbol = '−';
-        if (stageNum === 1) {
-          // Stage 1: Simple subtraction with positive result
-          a = this.randomInt(2, 10);
-          b = this.randomInt(1, a);
-        } else if (stageNum === 2) {
-          // Stage 2: Teens borrowing
-          a = this.randomInt(11, 20);
-          b = this.randomInt(3, a - 1);
-        } else if (stageNum === 3) {
-          // Stage 3: 2-digit subtraction
-          a = this.randomInt(25, 55);
-          b = this.randomInt(10, a - 2);
-        } else if (stageNum === 4) {
-          // Stage 4: Subtraction up to 100
-          a = this.randomInt(50, 95);
-          b = this.randomInt(20, a - 5);
-        } else if (stageNum === 5) {
-          // Stage 5: Subtraction up to 200
-          a = this.randomInt(80, 160);
-          b = this.randomInt(35, a - 10);
-        } else {
-          // Stage 6: Mythic subtraction
-          a = this.randomInt(150, 350);
-          b = this.randomInt(50, a - 20);
-        }
-        answer = a - b;
-      } else if (op === 'mul') {
-        symbol = '×';
-        if (stageNum === 2) {
-          // Stage 2: 2, 5, 10 times tables
-          const factors = [2, 5, 10];
-          a = factors[Math.floor(Math.random() * factors.length)];
-          b = this.randomInt(2, 9);
-        } else if (stageNum === 3) {
-          // Stage 3: 3, 4, 6, 7 times tables
-          const factors = [3, 4, 6, 7];
-          a = factors[Math.floor(Math.random() * factors.length)];
-          b = this.randomInt(3, 8);
-        } else if (stageNum === 4) {
-          // Stage 4: Tables up to 12
-          a = this.randomInt(6, 12);
-          b = this.randomInt(4, 12);
-        } else if (stageNum === 5) {
-          // Stage 5: Double-digit factors
-          a = this.randomInt(8, 15);
-          b = this.randomInt(6, 13);
-        } else {
-          // Stage 6: Mythic multiplication
-          a = this.randomInt(9, 18);
-          b = this.randomInt(7, 16);
-        }
-        answer = a * b;
-      } else if (op === 'div') {
-        symbol = '÷';
-        // Exact integer division with no remainders (dividend a = b * quotient)
-        let quotient = 2;
-        if (stageNum === 3) {
-          b = this.randomInt(2, 7);
-          quotient = this.randomInt(2, 8);
-        } else if (stageNum === 4) {
-          b = this.randomInt(4, 12);
-          quotient = this.randomInt(4, 12);
-        } else if (stageNum === 5) {
-          b = this.randomInt(6, 14);
-          quotient = this.randomInt(6, 14);
-        } else {
-          b = this.randomInt(7, 16);
-          quotient = this.randomInt(8, 16);
-        }
-        answer = quotient;
-        a = b * quotient;
-      }
-
-      return {
-        a,
-        b,
-        op,
-        symbol,
-        answer,
-        tier,
-        tierName,
-        bonusSeconds,
-        basePoints
-      };
-    },
-
-    generateQuestion() {
-      // Pick operation from currently active operations
-      let activeOps = state.operations.slice();
-      if (!activeOps || activeOps.length === 0) {
-        activeOps = ['add'];
-      }
-      const op = activeOps[Math.floor(Math.random() * activeOps.length)];
-
-      let a = 0;
-      let b = 0;
-      let answer = 0;
-      let symbol = '+';
-      let tier = 1;
-      let tierName = 'Level 1';
-      let bonusSeconds = 1;
-      let basePoints = 10;
-
-      const preset = state.preset;
-      const lvl = state.playerLevel || 1; // Adaptive difficulty proportional to player level!
-
-      if (op === 'add') {
-        symbol = '+';
-        if (preset === 'easy') {
-          // Easy: single-digit progressing to teens as level increases
-          if (lvl === 1) {
-            a = this.randomInt(1, 5);
-            b = this.randomInt(1, 5);
-            tier = 1;
-            tierName = 'Level 1 (Starter +)';
-            bonusSeconds = 1;
-            basePoints = 10;
-          } else if (lvl === 2) {
-            a = this.randomInt(3, 9);
-            b = this.randomInt(2, 9);
-            tier = 2;
-            tierName = 'Level 2 (Carrying +)';
-            bonusSeconds = 2;
-            basePoints = 20;
-          } else if (lvl === 3) {
-            a = this.randomInt(6, 14);
-            b = this.randomInt(4, 9);
-            tier = 3;
-            tierName = 'Level 3 (Teens +)';
-            bonusSeconds = 3;
-            basePoints = 35;
-          } else if (lvl === 4) {
-            a = this.randomInt(10, 22);
-            b = this.randomInt(5, 14);
-            tier = 4;
-            tierName = 'Level 4 (Double Digits)';
-            bonusSeconds = 4;
-            basePoints = 50;
-          } else {
-            // Level 5+
-            a = this.randomInt(15, 35);
-            b = this.randomInt(10, 25);
-            tier = 5;
-            tierName = `Level ${lvl} (Master +)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          answer = a + b;
-        } else if (preset === 'medium') {
-          if (lvl === 1) {
-            a = this.randomInt(3, 12);
-            b = this.randomInt(2, 10);
-            tier = 1;
-            tierName = 'Level 1 (Basic +)';
-            bonusSeconds = 1;
-            basePoints = 15;
-          } else if (lvl === 2) {
-            a = this.randomInt(8, 20);
-            b = this.randomInt(5, 15);
-            tier = 2;
-            tierName = 'Level 2 (Regrouping +)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 3) {
-            a = this.randomInt(14, 32);
-            b = this.randomInt(10, 25);
-            tier = 3;
-            tierName = 'Level 3 (2-Digits +)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 4) {
-            a = this.randomInt(22, 50);
-            b = this.randomInt(16, 40);
-            tier = 4;
-            tierName = 'Level 4 (Harder +)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else {
-            a = this.randomInt(35, 75);
-            b = this.randomInt(25, 65);
-            tier = 5;
-            tierName = `Level ${lvl} (Master +)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          answer = a + b;
-        } else {
-          // Hard or Custom
-          if (lvl === 1) {
-            a = this.randomInt(15, 40);
-            b = this.randomInt(10, 35);
-            tier = 2;
-            tierName = 'Level 1 (Addition)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 2) {
-            a = this.randomInt(25, 60);
-            b = this.randomInt(18, 50);
-            tier = 3;
-            tierName = 'Level 2 (Big Addition)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 3) {
-            a = this.randomInt(40, 85);
-            b = this.randomInt(28, 75);
-            tier = 4;
-            tierName = 'Level 3 (Advanced +)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else if (lvl === 4) {
-            a = this.randomInt(60, 115);
-            b = this.randomInt(45, 95);
-            tier = 5;
-            tierName = 'Level 4 (Champion +)';
-            bonusSeconds = 5;
-            basePoints = 75;
-          } else {
-            a = this.randomInt(85, 175);
-            b = this.randomInt(65, 145);
-            tier = 5;
-            tierName = `Level ${lvl} (Mythic +)`;
-            bonusSeconds = 5;
-            basePoints = 90;
-          }
-          answer = a + b;
-        }
-      } else if (op === 'sub') {
-        symbol = '−';
-        if (preset === 'easy') {
-          // Subtraction with guaranteed non-negative answer (a >= b)
-          if (lvl === 1) {
-            a = this.randomInt(2, 8);
-            b = this.randomInt(1, a);
-            tier = 1;
-            tierName = 'Level 1 (Simple −)';
-            bonusSeconds = 1;
-            basePoints = 10;
-          } else if (lvl === 2) {
-            a = this.randomInt(9, 14);
-            b = this.randomInt(3, a);
-            tier = 2;
-            tierName = 'Level 2 (Borrowing −)';
-            bonusSeconds = 2;
-            basePoints = 20;
-          } else if (lvl === 3) {
-            a = this.randomInt(13, 22);
-            b = this.randomInt(5, a - 1);
-            tier = 3;
-            tierName = 'Level 3 (Teens −)';
-            bonusSeconds = 3;
-            basePoints = 35;
-          } else if (lvl === 4) {
-            a = this.randomInt(18, 30);
-            b = this.randomInt(8, a - 2);
-            tier = 4;
-            tierName = 'Level 4 (2-Digits −)';
-            bonusSeconds = 4;
-            basePoints = 50;
-          } else {
-            a = this.randomInt(25, 48);
-            b = this.randomInt(10, a - 3);
-            tier = 5;
-            tierName = `Level ${lvl} (Master −)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          answer = a - b;
-        } else if (preset === 'medium') {
-          if (lvl === 1) {
-            a = this.randomInt(9, 16);
-            b = this.randomInt(2, a - 1);
-            tier = 1;
-            tierName = 'Level 1 (Intro −)';
-            bonusSeconds = 1;
-            basePoints = 15;
-          } else if (lvl === 2) {
-            a = this.randomInt(15, 26);
-            b = this.randomInt(6, a - 2);
-            tier = 2;
-            tierName = 'Level 2 (Borrowing −)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 3) {
-            a = this.randomInt(25, 45);
-            b = this.randomInt(12, a - 4);
-            tier = 3;
-            tierName = 'Level 3 (Double Digits −)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 4) {
-            a = this.randomInt(40, 75);
-            b = this.randomInt(18, a - 6);
-            tier = 4;
-            tierName = 'Level 4 (Tougher −)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else {
-            a = this.randomInt(60, 110);
-            b = this.randomInt(25, a - 8);
-            tier = 5;
-            tierName = `Level ${lvl} (Master −)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          answer = a - b;
-        } else {
-          // Hard or Custom
-          if (lvl === 1) {
-            a = this.randomInt(25, 50);
-            b = this.randomInt(8, a - 4);
-            tier = 2;
-            tierName = 'Level 1 (Subtraction)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 2) {
-            a = this.randomInt(40, 75);
-            b = this.randomInt(15, a - 5);
-            tier = 3;
-            tierName = 'Level 2 (Borrowing −)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 3) {
-            a = this.randomInt(65, 110);
-            b = this.randomInt(25, a - 8);
-            tier = 4;
-            tierName = 'Level 3 (Advanced −)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else if (lvl === 4) {
-            a = this.randomInt(90, 150);
-            b = this.randomInt(35, a - 10);
-            tier = 5;
-            tierName = 'Level 4 (Champion −)';
-            bonusSeconds = 5;
-            basePoints = 75;
-          } else {
-            a = this.randomInt(120, 220);
-            b = this.randomInt(45, a - 15);
-            tier = 5;
-            tierName = `Level ${lvl} (Mythic −)`;
-            bonusSeconds = 5;
-            basePoints = 90;
-          }
-          answer = a - b;
-        }
-      } else if (op === 'mul') {
-        symbol = '×';
-        if (preset === 'medium') {
-          if (lvl === 1) {
-            const factors = [2, 5, 10];
-            a = factors[Math.floor(Math.random() * factors.length)];
-            b = this.randomInt(2, 5);
-            tier = 1;
-            tierName = 'Level 1 (Easy ×)';
-            bonusSeconds = 1;
-            basePoints = 15;
-          } else if (lvl === 2) {
-            const factors = [2, 3, 4, 5, 10];
-            a = factors[Math.floor(Math.random() * factors.length)];
-            b = this.randomInt(2, 8);
-            tier = 2;
-            tierName = 'Level 2 (Tables 2-5)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 3) {
-            const factors = [3, 4, 6, 7];
-            a = factors[Math.floor(Math.random() * factors.length)];
-            b = this.randomInt(3, 8);
-            tier = 3;
-            tierName = 'Level 3 (Tables 3-7)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 4) {
-            const factors = [6, 7, 8, 9];
-            a = factors[Math.floor(Math.random() * factors.length)];
-            b = this.randomInt(4, 9);
-            tier = 4;
-            tierName = 'Level 4 (Tables 6-9)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else {
-            a = this.randomInt(6, 10);
-            b = this.randomInt(6, 10);
-            tier = 5;
-            tierName = `Level ${lvl} (Master ×)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          answer = a * b;
-        } else {
-          // Hard or Custom
-          if (lvl === 1) {
-            a = this.randomInt(3, 8);
-            b = this.randomInt(3, 8);
-            tier = 2;
-            tierName = 'Level 1 (Multiplication)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 2) {
-            a = this.randomInt(4, 9);
-            b = this.randomInt(4, 9);
-            tier = 3;
-            tierName = 'Level 2 (Up to 9×9)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 3) {
-            a = this.randomInt(6, 11);
-            b = this.randomInt(5, 10);
-            tier = 4;
-            tierName = 'Level 3 (Tables to 11)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else if (lvl === 4) {
-            a = this.randomInt(7, 12);
-            b = this.randomInt(6, 12);
-            tier = 5;
-            tierName = 'Level 4 (Full 12×12)';
-            bonusSeconds = 5;
-            basePoints = 75;
-          } else {
-            // Level 5+: 2-digit factors
-            a = this.randomInt(9, 15);
-            b = this.randomInt(6, 12);
-            tier = 5;
-            tierName = `Level ${lvl} (Mythic ×)`;
-            bonusSeconds = 5;
-            basePoints = 90;
-          }
-          answer = a * b;
-        }
-      } else if (op === 'div') {
-        symbol = '÷';
-        // Exact integer division with NO remainders!
-        // b = divisor, answer = quotient, dividend a = b * answer
-        if (preset === 'medium') {
-          if (lvl === 1) {
-            const divisors = [2, 5, 10];
-            b = divisors[Math.floor(Math.random() * divisors.length)];
-            answer = this.randomInt(2, 5);
-            tier = 1;
-            tierName = 'Level 1 (Easy ÷)';
-            bonusSeconds = 1;
-            basePoints = 15;
-          } else if (lvl === 2) {
-            b = this.randomInt(2, 5);
-            answer = this.randomInt(2, 8);
-            tier = 2;
-            tierName = 'Level 2 (Divisors 2-5)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 3) {
-            b = this.randomInt(3, 7);
-            answer = this.randomInt(3, 8);
-            tier = 3;
-            tierName = 'Level 3 (Divisors 3-7)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 4) {
-            b = this.randomInt(4, 8);
-            answer = this.randomInt(4, 9);
-            tier = 4;
-            tierName = 'Level 4 (Divisors 4-8)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else {
-            b = this.randomInt(6, 9);
-            answer = this.randomInt(5, 10);
-            tier = 5;
-            tierName = `Level ${lvl} (Master ÷)`;
-            bonusSeconds = 5;
-            basePoints = 75;
-          }
-          a = b * answer;
-        } else {
-          // Hard or Custom
-          if (lvl === 1) {
-            b = this.randomInt(3, 8);
-            answer = this.randomInt(3, 8);
-            tier = 2;
-            tierName = 'Level 1 (Division)';
-            bonusSeconds = 2;
-            basePoints = 25;
-          } else if (lvl === 2) {
-            b = this.randomInt(4, 9);
-            answer = this.randomInt(4, 9);
-            tier = 3;
-            tierName = 'Level 2 (Medium ÷)';
-            bonusSeconds = 3;
-            basePoints = 40;
-          } else if (lvl === 3) {
-            b = this.randomInt(5, 11);
-            answer = this.randomInt(5, 10);
-            tier = 4;
-            tierName = 'Level 3 (Advanced ÷)';
-            bonusSeconds = 4;
-            basePoints = 55;
-          } else if (lvl === 4) {
-            b = this.randomInt(6, 12);
-            answer = this.randomInt(6, 12);
-            tier = 5;
-            tierName = 'Level 4 (Tables to 12 ÷)';
-            bonusSeconds = 5;
-            basePoints = 75;
-          } else {
-            b = this.randomInt(7, 14);
-            answer = this.randomInt(6, 13);
-            tier = 5;
-            tierName = `Level ${lvl} (Mythic ÷)`;
-            bonusSeconds = 5;
-            basePoints = 90;
-          }
-          a = b * answer;
-        }
-      }
-
-      return {
-        a,
-        b,
-        op,
-        symbol,
-        answer,
-        tier,
-        tierName,
-        bonusSeconds,
-        basePoints
-      };
-    }
-  };
-
-  /* ==========================================================================
-     7. GAME CONTROLLER, LEVEL PROGRESSION & TIMER
-     ========================================================================== */
-  function getLevelThreshold(level) {
-    const thresholds = [0, 100, 250, 450, 700, 1000, 1400, 1900];
-    if (level < thresholds.length) return thresholds[level];
-    return 1900 + (level - 7) * 600;
-  }
-
-  function getPrevLevelThreshold(level) {
-    if (level <= 1) return 0;
-    return getLevelThreshold(level - 1);
-  }
-
-  function updateLevelHUD() {
-    const lvl = state.playerLevel;
-    if (elements.hudLevel) {
-      elements.hudLevel.textContent = `${lvl} ⭐`;
-    }
-    const prevThresh = getPrevLevelThreshold(lvl);
-    const nextThresh = getLevelThreshold(lvl);
-    const range = Math.max(1, nextThresh - prevThresh);
-    const currentInLevel = Math.max(0, state.score - prevThresh);
-    const pct = Math.min(100, Math.max(0, Math.round((currentInLevel / range) * 100)));
-    if (elements.levelBarFill) {
-      elements.levelBarFill.style.width = `${pct}%`;
-    }
-  }
-
-  function triggerLevelUp(newLevel) {
-    const titleIdx = Math.min(newLevel, state.levelTitles.length - 1);
-    const title = state.levelTitles[titleIdx];
-
-    // Grant Level-up Time Bonus (+5s!)
-    addBonusTime(5);
-
-    // Play level up sound & confetti
-    SoundFX.playLevelUp();
-    triggerConfetti();
-
-    // Display Level Up Banner
-    if (elements.levelUpBanner) {
-      if (elements.levelUpTitle) {
-        elements.levelUpTitle.textContent = `LEVEL ${newLevel}: ${title.toUpperCase()}!`;
-      }
-      if (elements.levelUpDesc) {
-        elements.levelUpDesc.textContent = `+5s Bonus Time! Math challenges upgraded! 🚀`;
-      }
-      if (elements.levelUpBadge) {
-        elements.levelUpBadge.textContent = `+5s ⏱️`;
-      }
-
-      elements.levelUpBanner.classList.remove('hidden', 'fade-out');
-
-      if (state.levelUpTimeoutId) clearTimeout(state.levelUpTimeoutId);
-      state.levelUpTimeoutId = setTimeout(() => {
-        elements.levelUpBanner.classList.add('fade-out');
-        setTimeout(() => {
-          elements.levelUpBanner.classList.add('hidden');
-          elements.levelUpBanner.classList.remove('fade-out');
-        }, 400);
-      }, 2600);
-    }
-  }
-
-  function triggerStreakMilestone(streak, milestoneData) {
-    // Play celebratory sound & confetti
-    SoundFX.playStreakMilestone(streak);
-    triggerConfetti();
-
-    // Display Streak Achievement Banner
-    if (elements.streakAchievementBanner) {
-      if (elements.streakAchievementIcon) elements.streakAchievementIcon.textContent = milestoneData.icon;
-      if (elements.streakAchievementKicker) elements.streakAchievementKicker.textContent = milestoneData.kicker;
-      if (elements.streakAchievementTitle) elements.streakAchievementTitle.textContent = milestoneData.title;
-      if (elements.streakAchievementDesc) elements.streakAchievementDesc.textContent = milestoneData.desc;
-      if (elements.streakAchievementBonus) elements.streakAchievementBonus.textContent = `+${milestoneData.bonus} PTS`;
-
-      elements.streakAchievementBanner.classList.remove('hidden', 'fade-out');
-
-      if (state.streakMilestoneTimeoutId) clearTimeout(state.streakMilestoneTimeoutId);
-      state.streakMilestoneTimeoutId = setTimeout(() => {
-        elements.streakAchievementBanner.classList.add('fade-out');
-        setTimeout(() => {
-          elements.streakAchievementBanner.classList.add('hidden');
-          elements.streakAchievementBanner.classList.remove('fade-out');
-        }, 400);
-      }, 2600);
-    }
-  }
-
-  function switchScreen(screenElement) {
-    [elements.screenConfig, elements.screenGame, elements.screenSummary].forEach(screen => {
-      screen.classList.remove('active');
-    });
-    screenElement.classList.add('active');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  function startGame() {
-    // Sync settings from inputs
-    validateSettings();
-
-    // Level Quest mode: untimed, 20 questions per level
-    if (state.gameMode === 'levelQuest') {
-      startLevelQuest();
-      return;
-    }
-
-    // Reset game state
-    state.isPlaying = true;
-    state.isPaused = false;
-    state.isSubmitting = false; // Debounce lock reset
-    state.score = 0;
-    state.streak = 0;
-    state.bestStreak = 0;
-    state.playerLevel = 1;
-    state.highestLevelReached = 1;
-    state.correctCount = 0;
-    state.missedCount = 0;
-    state.totalAnswered = 0;
-    state.bonusTimeEarned = 0;
-    state.questionNumber = 0;
-    state.currentInput = '';
-    state.timeLeft = state.startingTime;
-    state.timerInitial = state.startingTime;
-    state.lastTickTime = Date.now();
-
-    // Reset HUD visibility for regular modes
-    if (elements.hudLevelCard) elements.hudLevelCard.classList.remove('hidden');
-    if (elements.hudStageCard) elements.hudStageCard.classList.remove('hidden');
-    if (elements.hudStageProgressCard) elements.hudStageProgressCard.classList.remove('hidden');
-    if (elements.hudTimerContainer) {
-      elements.hudTimerContainer.classList.remove('hidden');
-      elements.hudTimerContainer.classList.remove('level-quest-mode');
-    }
-    elements.hudScore.textContent = '0';
-    elements.hudStreak.textContent = '0 🔥';
-    elements.hudMultiplier.textContent = '1x';
-    updateLevelHUD();
-    updateTimerHUD();
-
-    // Reset banners
-    if (elements.levelUpBanner) elements.levelUpBanner.classList.add('hidden');
-    if (elements.streakAchievementBanner) elements.streakAchievementBanner.classList.add('hidden');
-
-    // Audio context initialization
-    SoundFX.getAudioContext();
-    SoundFX.playTap();
-
-    // Switch to gameplay screen
-    switchScreen(elements.screenGame);
-
-    // Present first question
-    nextQuestion();
-
-    // Start timer interval
-    if (state.timerIntervalId) clearInterval(state.timerIntervalId);
-    state.timerIntervalId = setInterval(gameTimerTick, 100);
-  }
-
-  function gameTimerTick() {
-    if (!state.isPlaying || state.isPaused) return;
-
-    const now = Date.now();
-    const deltaSeconds = (now - state.lastTickTime) / 1000;
-    state.lastTickTime = now;
-
-    state.timeLeft = Math.max(0, state.timeLeft - deltaSeconds);
-    updateTimerHUD();
-
-    if (state.timeLeft <= 0) {
-      endGame();
-    }
-  }
-
-  function updateTimerHUD() {
-    const displaySeconds = Math.ceil(state.timeLeft);
-    elements.hudTimer.textContent = String(displaySeconds);
-
-    // Progress bar fill %
-    const pct = Math.min(100, Math.max(0, (state.timeLeft / state.timerInitial) * 100));
-    elements.timerBarFill.style.width = `${pct}%`;
-
-    // Urgency cues
-    if (state.timeLeft <= 5.5) {
-      elements.hudTimerContainer.classList.add('urgent');
-      elements.hudTimerContainer.classList.remove('warning');
-    } else if (state.timeLeft <= 15) {
-      elements.hudTimerContainer.classList.add('warning');
-      elements.hudTimerContainer.classList.remove('urgent');
-    } else {
-      elements.hudTimerContainer.classList.remove('warning', 'urgent');
-    }
-  }
-
-  function addBonusTime(bonusSeconds) {
-    state.timeLeft += bonusSeconds;
-    state.bonusTimeEarned += bonusSeconds;
-    updateTimerHUD();
-
-    // Show floating bonus notification
-    elements.bonusTimePopup.textContent = `+${bonusSeconds}s! ⏱️`;
-    elements.bonusTimePopup.classList.remove('show');
-    // Force reflow
-    void elements.bonusTimePopup.offsetWidth;
-    elements.bonusTimePopup.classList.add('show');
-
-    SoundFX.playBonusTime();
-  }
-
-  function nextQuestion() {
-    // Level Quest mode: use level quest question flow
-    if (state.gameMode === 'levelQuest') {
-      nextLevelQuestion();
-      return;
-    }
-    state.isSubmitting = false; // Release submission lock for the new question
-    state.questionNumber++;
-    state.currentQuestion = MathEngine.generateQuestion();
-    state.currentInput = '';
-    elements.answerText.textContent = '';
-
-    // Render Question
-    elements.questionCounter.textContent = `Question #${state.questionNumber}`;
-    elements.termA.textContent = String(state.currentQuestion.a);
-    elements.termOp.textContent = state.currentQuestion.symbol;
-    elements.termB.textContent = String(state.currentQuestion.b);
-
-    // Render Tier Badge
-    elements.questionTierBadge.innerHTML = `⭐ ${state.currentQuestion.tierName} <span class="tier-bonus-text">(+${state.currentQuestion.bonusSeconds}s bonus)</span>`;
-
-    // Reset visual feedback
-    elements.userAnswerBox.className = 'user-answer-box active';
-    elements.feedbackBanner.className = 'feedback-banner';
-    elements.feedbackMascot.textContent = '🌟';
-    elements.feedbackMsg.textContent = 'Type your answer and tap GO!';
-  }
-
-  function appendDigit(digit) {
-    if (!state.isPlaying || state.isSubmitting) return;
-    if (state.currentInput.length >= 4) return; // Cap at 4 digits for kid sanity
-    state.currentInput += digit;
-    elements.answerText.textContent = state.currentInput;
-    SoundFX.playTap();
-  }
-
-  function backspaceDigit() {
-    if (!state.isPlaying || state.isSubmitting) return;
-    state.currentInput = state.currentInput.slice(0, -1);
-    elements.answerText.textContent = state.currentInput;
-    SoundFX.playTap();
-  }
-
-  function clearInput() {
-    if (!state.isPlaying || state.isSubmitting) return;
-    state.currentInput = '';
-    elements.answerText.textContent = '';
-    SoundFX.playTap();
-  }
-
-  function submitAnswer() {
-    // Level Quest mode: use level quest answer flow
-    if (state.gameMode === 'levelQuest') {
-      submitLevelAnswer();
-      return;
-    }
-    // Debounce & Lock: ignore rapid Enter keystrokes or double clicks on the same question
-    if (!state.isPlaying || state.isSubmitting) return;
-
-    if (!state.currentInput || state.currentInput.trim() === '') {
-      // Empty input wiggle
-      elements.userAnswerBox.classList.add('shake');
-      setTimeout(() => elements.userAnswerBox.classList.remove('shake'), 400);
-      elements.feedbackBanner.className = 'feedback-banner incorrect';
-      elements.feedbackMascot.textContent = '👉';
-      elements.feedbackMsg.textContent = 'Please enter an answer first!';
-      return;
-    }
-
-    // Lock submission immediately to prevent duplicate scoring!
-    state.isSubmitting = true;
-
-    const userAnswer = parseInt(state.currentInput, 10);
-    const expected = state.currentQuestion.answer;
-    state.totalAnswered++;
-
-    if (userAnswer === expected) {
-      // CORRECT ANSWER!
-      state.correctCount++;
-      state.streak++;
-      if (state.streak > state.bestStreak) {
-        state.bestStreak = state.streak;
-      }
-
-      // Calculate Streak Multiplier (scaled extra high for long streaks)
-      let multiplier = 1.0;
-      if (state.streak >= 100) multiplier = 4.0;
-      else if (state.streak >= 50) multiplier = 3.0;
-      else if (state.streak >= 20) multiplier = 2.5;
-      else if (state.streak >= 10) multiplier = 2.0;
-      else if (state.streak >= 5) multiplier = 1.5;
-      else if (state.streak >= 3) multiplier = 1.25;
-
-      const ptsEarned = Math.round(state.currentQuestion.basePoints * multiplier);
-      state.score += ptsEarned;
-
-      // Update HUD
-      elements.hudScore.textContent = String(state.score);
-      elements.hudStreak.textContent = `${state.streak} 🔥`;
-      elements.hudMultiplier.textContent = `${multiplier}x`;
-
-      // Score popup
-      elements.scorePopup.textContent = `+${ptsEarned}`;
-      elements.scorePopup.classList.remove('show');
-      void elements.scorePopup.offsetWidth;
-      elements.scorePopup.classList.add('show');
-
-      // Grant Bonus Time for thinking!
-      addBonusTime(state.currentQuestion.bonusSeconds);
-
-      // Play Sound
-      SoundFX.playCorrect(state.currentQuestion.tier);
-
-      // Check Streak Milestones: 5, 10, 20, 50, 100
-      const STREAK_MILESTONES = {
-        5: { bonus: 25, title: '5 IN A ROW!', kicker: '🔥 SUPER STREAK!', desc: '+25 Streak Bonus Points! You are on fire!', icon: '🔥' },
-        10: { bonus: 50, title: '10 IN A ROW!', kicker: '⚡ UNSTOPPABLE!', desc: '+50 Streak Bonus Points! 2x Multiplier Active!', icon: '⚡' },
-        20: { bonus: 100, title: '20 IN A ROW!', kicker: '🌟 MATH MASTER!', desc: '+100 Streak Bonus Points! Pure mathematical brilliance!', icon: '🌟' },
-        50: { bonus: 250, title: '50 IN A ROW!', kicker: '🚀 LEGENDARY HERO!', desc: '+250 Streak Bonus Points! True Math Champion!', icon: '🚀' },
-        100: { bonus: 500, title: '100 IN A ROW!', kicker: '👑 MYTHIC GODLIKE!', desc: '+500 Streak Bonus Points! Unbelievable Mastery!', icon: '👑' }
-      };
-
-      if (STREAK_MILESTONES[state.streak]) {
-        const ms = STREAK_MILESTONES[state.streak];
-        state.score += ms.bonus;
-        elements.hudScore.textContent = String(state.score);
-        triggerStreakMilestone(state.streak, ms);
-      } else if (state.streak % 5 === 0 && state.streak > 5) {
-        setTimeout(() => SoundFX.playStreak(), 200);
-      }
-
-      // Check Level Up progression!
-      while (state.score >= getLevelThreshold(state.playerLevel)) {
-        state.playerLevel++;
-        if (state.playerLevel > state.highestLevelReached) {
-          state.highestLevelReached = state.playerLevel;
-        }
-        triggerLevelUp(state.playerLevel);
-      }
-      updateLevelHUD();
-
-      // Visual feedback
-      elements.userAnswerBox.className = 'user-answer-box correct';
-      elements.feedbackBanner.className = 'feedback-banner correct';
-      const phrase = CORRECT_PHRASES[Math.floor(Math.random() * CORRECT_PHRASES.length)];
-      elements.feedbackMascot.textContent = phrase.mascot;
-      elements.feedbackMsg.textContent = `${phrase.text} (+${ptsEarned} pts, +${state.currentQuestion.bonusSeconds}s)`;
-
-      // Move to next after quick encouraging beat
-      setTimeout(() => {
-        if (state.isPlaying) {
-          nextQuestion();
-        }
-      }, 350);
-
-    } else {
-      // INCORRECT ANSWER
-      state.missedCount++;
-      state.streak = 0;
-      elements.hudStreak.textContent = '0 🔥';
-      elements.hudMultiplier.textContent = '1x';
-
-      SoundFX.playIncorrect();
-
-      // Visual feedback (gentle without harsh punishment)
-      elements.userAnswerBox.className = 'user-answer-box shake';
-      elements.feedbackBanner.className = 'feedback-banner incorrect';
-      const encouragement = ENCOURAGING_TRY_AGAIN[Math.floor(Math.random() * ENCOURAGING_TRY_AGAIN.length)];
-      elements.feedbackMascot.textContent = encouragement.mascot;
-      elements.feedbackMsg.textContent = `${encouragement.text} (Correct: ${expected})`;
-
-      // Allow quick transition to keep rhythm
-      setTimeout(() => {
-        if (state.isPlaying) {
-          nextQuestion();
-        }
-      }, 750);
-    }
-  }
-
-  function skipQuestion() {
-    // Level Quest mode: use level quest skip flow
-    if (state.gameMode === 'levelQuest') {
-      skipLevelQuestion();
-      return;
-    }
-    if (!state.isPlaying || state.isSubmitting) return;
-    state.isSubmitting = true;
-
-    state.totalAnswered++;
-    state.missedCount++;
-    state.streak = 0;
-    elements.hudStreak.textContent = '0 🔥';
-    elements.hudMultiplier.textContent = '1x';
-
-    SoundFX.playIncorrect();
-
-    const expected = state.currentQuestion.answer;
-    elements.feedbackBanner.className = 'feedback-banner';
-    elements.feedbackMascot.textContent = '⏭️';
-    elements.feedbackMsg.textContent = `Skipped! The answer was ${expected}.`;
-
-    setTimeout(() => {
-      if (state.isPlaying) {
-        nextQuestion();
-      }
-    }, 450);
-  }
-
-  function endGame() {
-    if (!state.isPlaying) return;
-    state.isPlaying = false;
-    state.isSubmitting = false;
-    clearInterval(state.timerIntervalId);
-    state.timerIntervalId = null;
-
-    SoundFX.playRoundOver();
-
-    // Calculate final stats
-    const total = state.totalAnswered;
-    const correct = state.correctCount;
-    const missed = state.missedCount;
-    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
-
-    // Check High Score
-    const prevBestScore = state.saveData.highScores[state.preset] || 0;
-    const prevBestAcc = state.saveData.bestAccuracy[state.preset] || 0;
-    const isNewHighScore = state.score > prevBestScore && state.score > 0;
-    const isNewBestAcc = accuracy > prevBestAcc && total >= 5;
-
-    if (isNewHighScore) {
-      state.saveData.highScores[state.preset] = state.score;
-    }
-    if (isNewBestAcc) {
-      state.saveData.bestAccuracy[state.preset] = accuracy;
-    }
-
-    // Record game in history
-    const now = new Date();
-    const dateFormatted = `${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-    const gameRecord = {
-      id: String(now.getTime()),
-      date: dateFormatted,
-      timestamp: now.getTime(),
-      preset: state.preset,
-      score: state.score,
-      maxLevel: state.highestLevelReached,
-      total,
-      correct,
-      missed,
-      accuracy,
-      streak: state.bestStreak,
-      duration: state.startingTime,
-      bonusEarned: state.bonusTimeEarned
-    };
-
-    state.saveData.history.push(gameRecord);
-    StorageManager.saveData();
-
-    // Populate Summary Screen
-    elements.summaryScore.textContent = String(state.score);
-    if (elements.summaryLevel) {
-      const lvlTitle = state.levelTitles[Math.min(state.highestLevelReached, state.levelTitles.length - 1)];
-      elements.summaryLevel.textContent = `Lvl ${state.highestLevelReached} (${lvlTitle})`;
-    }
-    elements.summaryAccuracy.textContent = `${accuracy}%`;
-    elements.summaryCorrect.textContent = String(correct);
-    elements.summaryMissed.textContent = String(missed);
-    elements.summaryStreak.textContent = `${state.bestStreak} 🔥`;
-    elements.summaryBonusEarned.textContent = `+${state.bonusTimeEarned}s`;
-
-    // Legend percentages
-    elements.legendCorrectPct.textContent = `${accuracy}% (${correct})`;
-    elements.legendMissedPct.textContent = `${100 - accuracy}% (${missed})`;
-
-    // High Score Banner & Celebration
-    if (isNewHighScore) {
-      elements.highScoreBanner.classList.remove('hidden');
-      elements.summaryMascot.textContent = '🏆';
-      elements.summaryTitle.textContent = 'NEW HIGH SCORE!';
-      elements.summaryCompliment.textContent = 'You set a brand new record for this mode! You are unstoppable!';
-      SoundFX.playHighScoreFanfare();
-      triggerConfetti();
-    } else {
-      elements.highScoreBanner.classList.add('hidden');
-      elements.summaryMascot.textContent = accuracy >= 80 ? '🌟' : '🚀';
-      elements.summaryTitle.textContent = 'Round Complete!';
-      elements.summaryCompliment.textContent = accuracy >= 80
-        ? 'Outstanding math work! Your accuracy is through the roof!'
-        : 'Great effort! Every round makes your brain stronger!';
-    }
-
-    // Render Accuracy Pie / Donut Chart
-    renderAccuracyPieChart(correct, missed);
-
-    // Switch screen
-    switchScreen(elements.screenSummary);
-  }
-
-  /* ==========================================================================
-     8. CELEBRATION & CONFETTI ENGINE
-     Uses canvas-confetti if loaded via CDN, with smooth fallback particle burst!
-     ========================================================================== */
-  function triggerConfetti() {
-    if (typeof window.confetti === 'function') {
-      try {
-        // Multi-stage confetti burst
-        window.confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 }
-        });
-        setTimeout(() => {
-          window.confetti({
-            particleCount: 60,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 }
-          });
-          window.confetti({
-            particleCount: 60,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 }
-          });
-        }, 250);
-        return;
-      } catch (e) {
-        console.warn('Canvas confetti error, falling back', e);
-      }
-    }
-
-    // Fallback simple DOM starburst particles
-    createFallbackConfetti();
-  }
-
-  function createFallbackConfetti() {
-    const container = document.createElement('div');
-    container.style.position = 'fixed';
-    container.style.inset = '0';
-    container.style.pointerEvents = 'none';
-    container.style.zIndex = '9999';
-    container.style.overflow = 'hidden';
-    document.body.appendChild(container);
-
-    const colors = ['#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#8b5cf6'];
-    const emojis = ['⭐', '🎉', '✨', '🏆', '💎'];
-
-    for (let i = 0; i < 35; i++) {
-      const p = document.createElement('span');
-      p.textContent = emojis[i % emojis.length];
-      p.style.position = 'absolute';
-      p.style.left = `${Math.random() * 90 + 5}vw`;
-      p.style.top = `${Math.random() * 40 + 10}vh`;
-      p.style.fontSize = `${Math.random() * 20 + 16}px`;
-      p.style.transition = 'all 1.4s ease-out';
-      p.style.transform = 'translateY(0) scale(1) rotate(0deg)';
-      p.style.opacity = '1';
-      container.appendChild(p);
-
-      setTimeout(() => {
-        p.style.transform = `translateY(${Math.random() * 300 + 150}px) scale(0.5) rotate(${Math.random() * 360}deg)`;
-        p.style.opacity = '0';
-      }, 50);
-    }
-
-    setTimeout(() => {
-      container.remove();
-    }, 1800);
-  }
-
-  /* ==========================================================================
-     9. CHARTS: ACCURACY PIE CHART & TREND GRAPHS (Chart.js + SVG Fallback)
-     ========================================================================== */
-  function renderAccuracyPieChart(correct, missed) {
-    const total = correct + missed;
-    const safeCorrect = total === 0 ? 1 : correct;
-    const safeMissed = total === 0 ? 0 : missed;
-
-    // Check if Chart.js is available
-    if (typeof Chart !== 'undefined') {
-      try {
-        elements.accuracySvgFallback.classList.add('hidden');
-        elements.accuracyChartCanvas.classList.remove('hidden');
-
-        if (state.accuracyChartInstance) {
-          state.accuracyChartInstance.destroy();
-          state.accuracyChartInstance = null;
-        }
-
-        const ctx = elements.accuracyChartCanvas.getContext('2d');
-        state.accuracyChartInstance = new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Correct', 'Missed/Skipped'],
-            datasets: [{
-              data: [safeCorrect, safeMissed],
-              backgroundColor: ['#10b981', '#f87171'],
-              borderColor: ['#ffffff', '#ffffff'],
-              borderWidth: 4,
-              hoverOffset: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                callbacks: {
-                  label: function (context) {
-                    const label = context.label || '';
-                    const val = context.raw || 0;
-                    const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                    return ` ${label}: ${val} (${pct}%)`;
-                  }
-                }
-              }
-            },
-            cutout: '68%'
-          }
-        });
-        return;
-      } catch (err) {
-        console.warn('Chart.js render failed, using SVG fallback', err);
-      }
-    }
-
-    // SVG Fallback for Donut/Pie Chart
-    renderAccuracySvgFallback(correct, missed);
-  }
-
-  function renderAccuracySvgFallback(correct, missed) {
-    elements.accuracyChartCanvas.classList.add('hidden');
-    elements.accuracySvgFallback.classList.remove('hidden');
-
-    const total = correct + missed;
-    const correctPct = total > 0 ? Math.round((correct / total) * 100) : 0;
-    const radius = 60;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (correctPct / 100) * circumference;
-
-    elements.accuracySvgFallback.innerHTML = `
-      <svg width="180" height="180" viewBox="0 0 160 160">
-        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#fecaca" stroke-width="24" />
-        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#10b981" stroke-width="24"
-          stroke-dasharray="${circumference}"
-          stroke-dashoffset="${strokeDashoffset}"
-          stroke-linecap="round"
-          transform="rotate(-90 80 80)"
-        />
-        <text x="80" y="75" text-anchor="middle" font-family="'Fredoka', sans-serif" font-weight="700" font-size="28" fill="#1e293b">
-          ${correctPct}%
-        </text>
-        <text x="80" y="98" text-anchor="middle" font-family="'Quicksand', sans-serif" font-weight="700" font-size="12" fill="#64748b">
-          ACCURACY
-        </text>
-      </svg>
-    `;
-  }
-
-  function renderTrendGraphs() {
-    const history = state.saveData.history.slice(-12); // Last 12 games
-    const labels = history.map((g, i) => `#${i + 1} (${g.preset})`);
-    const scores = history.map(g => g.score);
-    const accuracies = history.map(g => g.accuracy);
-
-    if (history.length === 0) {
-      elements.scoreTrendSvgFallback.innerHTML = '<p class="empty-history-cell">Play your first round to generate trend graphs! 🚀</p>';
-      elements.scoreTrendSvgFallback.classList.remove('hidden');
-      elements.scoreTrendCanvas.classList.add('hidden');
-
-      elements.accTrendSvgFallback.innerHTML = '<p class="empty-history-cell">Play your first round to generate trend graphs! 🚀</p>';
-      elements.accTrendSvgFallback.classList.remove('hidden');
-      elements.accuracyTrendCanvas.classList.add('hidden');
-      return;
-    }
-
-    if (typeof Chart !== 'undefined') {
-      try {
-        elements.scoreTrendSvgFallback.classList.add('hidden');
-        elements.scoreTrendCanvas.classList.remove('hidden');
-        elements.accTrendSvgFallback.classList.add('hidden');
-        elements.accuracyTrendCanvas.classList.remove('hidden');
-
-        // Score Trend Chart
-        if (state.scoreTrendChartInstance) {
-          state.scoreTrendChartInstance.destroy();
-          state.scoreTrendChartInstance = null;
-        }
-
-        const scoreCtx = elements.scoreTrendCanvas.getContext('2d');
-        state.scoreTrendChartInstance = new Chart(scoreCtx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Score',
-              data: scores,
-              borderColor: '#4f46e5',
-              backgroundColor: 'rgba(79, 70, 229, 0.12)',
-              borderWidth: 3,
-              tension: 0.35,
-              fill: true,
-              pointBackgroundColor: '#4f46e5',
-              pointRadius: 5,
-              pointHoverRadius: 7
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                beginAtZero: true,
-                ticks: { precision: 0 }
-              }
-            },
-            plugins: {
-              legend: { display: false }
-            }
-          }
-        });
-
-        // Accuracy Trend Chart
-        if (state.accuracyTrendChartInstance) {
-          state.accuracyTrendChartInstance.destroy();
-          state.accuracyTrendChartInstance = null;
-        }
-
-        const accCtx = elements.accuracyTrendCanvas.getContext('2d');
-        state.accuracyTrendChartInstance = new Chart(accCtx, {
-          type: 'line',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Accuracy %',
-              data: accuracies,
-              borderColor: '#10b981',
-              backgroundColor: 'rgba(16, 185, 129, 0.12)',
-              borderWidth: 3,
-              tension: 0.35,
-              fill: true,
-              pointBackgroundColor: '#10b981',
-              pointRadius: 5,
-              pointHoverRadius: 7
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-              y: {
-                min: 0,
-                max: 100,
-                ticks: {
-                  callback: val => `${val}%`
-                }
-              }
-            },
-            plugins: {
-              legend: { display: false }
-            }
-          }
-        });
-
-        return;
-      } catch (err) {
-        console.warn('Trend Chart.js failed, fallback to SVG', err);
-      }
-    }
-
-    // SVG Fallback for Trend Lines
-    renderTrendSvgFallback(history);
-  }
-
-  function renderTrendSvgFallback(history) {
-    elements.scoreTrendCanvas.classList.add('hidden');
-    elements.scoreTrendSvgFallback.classList.remove('hidden');
-    elements.accuracyTrendCanvas.classList.add('hidden');
-    elements.accTrendSvgFallback.classList.remove('hidden');
-
-    const maxScore = Math.max(...history.map(g => g.score), 10);
-    const width = 500;
-    const height = 180;
-    const padding = 25;
-
-    // Draw Score Path
-    const scorePoints = history.map((g, i) => {
-      const x = padding + (i / Math.max(1, history.length - 1)) * (width - 2 * padding);
-      const y = height - padding - (g.score / maxScore) * (height - 2 * padding);
-      return `${x},${y}`;
-    }).join(' ');
-
-    elements.scoreTrendSvgFallback.innerHTML = `
-      <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" style="background:#f8fafc; border-radius:12px;">
-        <polyline fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" points="${scorePoints}" />
-        ${history.map((g, i) => {
-          const x = padding + (i / Math.max(1, history.length - 1)) * (width - 2 * padding);
-          const y = height - padding - (g.score / maxScore) * (height - 2 * padding);
-          return `<circle cx="${x}" cy="${y}" r="4" fill="#4f46e5" /><text x="${x}" y="${y - 8}" font-size="10" text-anchor="middle" fill="#4f46e5">${g.score}</text>`;
-        }).join('')}
-      </svg>
-    `;
-
-    // Draw Accuracy Path
-    const accPoints = history.map((g, i) => {
-      const x = padding + (i / Math.max(1, history.length - 1)) * (width - 2 * padding);
-      const y = height - padding - (g.accuracy / 100) * (height - 2 * padding);
-      return `${x},${y}`;
-    }).join(' ');
-
-    elements.accTrendSvgFallback.innerHTML = `
-      <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" style="background:#f8fafc; border-radius:12px;">
-        <polyline fill="none" stroke="#10b981" stroke-width="3" stroke-linecap="round" points="${accPoints}" />
-        ${history.map((g, i) => {
-          const x = padding + (i / Math.max(1, history.length - 1)) * (width - 2 * padding);
-          const y = height - padding - (g.accuracy / 100) * (height - 2 * padding);
-          return `<circle cx="${x}" cy="${y}" r="4" fill="#10b981" /><text x="${x}" y="${y - 8}" font-size="10" text-anchor="middle" fill="#059669">${g.accuracy}%</text>`;
-        }).join('')}
-      </svg>
-    `;
-  }
-
-  function renderHistoryModal() {
-    const history = state.saveData.history;
-    const totalGames = history.length;
-
-    let bestScoreAllTime = 0;
-    let sumAccuracy = 0;
-
-    history.forEach(g => {
-      if (g.score > bestScoreAllTime) bestScoreAllTime = g.score;
-      sumAccuracy += g.accuracy;
-    });
-
-    const avgAccuracy = totalGames > 0 ? Math.round(sumAccuracy / totalGames) : 0;
-
-    elements.histTotalGames.textContent = String(totalGames);
-    elements.histBestScore.textContent = `${bestScoreAllTime} pts`;
-    elements.histAvgAccuracy.textContent = `${avgAccuracy}%`;
-
-    // Render Table
-    if (totalGames === 0) {
-      elements.historyTbody.innerHTML = `
-        <tr>
-          <td colspan="7" class="empty-history-cell">No games played yet! Start your first game above! 🚀</td>
-        </tr>
-      `;
-    } else {
-      const reversed = history.slice().reverse();
-      elements.historyTbody.innerHTML = reversed.map(game => {
-        const accColor = game.accuracy >= 90 ? '#10b981' : game.accuracy >= 70 ? '#f59e0b' : '#ef4444';
-        const lvl = game.maxLevel || 1;
-        return `
-          <tr>
-            <td><strong>${game.date}</strong></td>
-            <td><span class="preset-badge" style="position:static; display:inline-block;">${game.preset}</span></td>
-            <td><span style="color:#9333ea; font-weight:700;">Level ${lvl} ⭐</span></td>
-            <td><strong>${game.score} pts</strong></td>
-            <td><span style="color:${accColor}; font-weight:700;">${game.accuracy}%</span></td>
-            <td>${game.correct}/${game.total}</td>
-            <td>${game.duration}s</td>
-          </tr>
-        `;
-      }).join('');
-    }
-
-    // Render Trend Graphs
-    renderTrendGraphs();
-
-    elements.modalHistory.classList.remove('hidden');
-  }
-
-  /* ==========================================================================
-     10. CONFIGURATION & PRESET LOGIC
-     ========================================================================== */
-  function applyPreset(presetName) {
-    state.preset = presetName;
-
-    elements.presetCards.forEach(card => {
-      const isCurrent = card.dataset.preset === presetName;
-      card.classList.toggle('active', isCurrent);
-      card.setAttribute('aria-checked', String(isCurrent));
-    });
-
-    if (presetName === 'easy') {
-      elements.opCheckboxes.add.checked = true;
-      elements.opCheckboxes.sub.checked = true;
-      elements.opCheckboxes.mul.checked = false;
-      elements.opCheckboxes.div.checked = false;
-    } else if (presetName === 'medium') {
-      elements.opCheckboxes.add.checked = true;
-      elements.opCheckboxes.sub.checked = true;
-      elements.opCheckboxes.mul.checked = true;
-      elements.opCheckboxes.div.checked = false;
-    } else if (presetName === 'hard') {
-      elements.opCheckboxes.add.checked = true;
-      elements.opCheckboxes.sub.checked = true;
-      elements.opCheckboxes.mul.checked = true;
-      elements.opCheckboxes.div.checked = true;
-    }
-
-    validateSettings();
-    StorageManager.updateBestRecordUI();
-    SoundFX.playTap();
-  }
-
-  function validateSettings() {
-    // Collect active operations
-    const activeOps = [];
-    if (elements.opCheckboxes.add.checked) activeOps.push('add');
-    if (elements.opCheckboxes.sub.checked) activeOps.push('sub');
-    if (elements.opCheckboxes.mul.checked) activeOps.push('mul');
-    if (elements.opCheckboxes.div.checked) activeOps.push('div');
-
-    // Never leave with zero operations
-    if (activeOps.length === 0) {
-      elements.opCheckboxes.add.checked = true;
-      activeOps.push('add');
-    }
-    state.operations = activeOps;
-
-    // Detect if operation checkboxes still match preset
-    const isEasy = activeOps.length === 2 && activeOps.includes('add') && activeOps.includes('sub');
-    const isMedium = activeOps.length === 3 && activeOps.includes('add') && activeOps.includes('sub') && activeOps.includes('mul');
-    const isHard = activeOps.length === 4;
-
-    if (state.preset === 'easy' && !isEasy) state.preset = 'custom';
-    else if (state.preset === 'medium' && !isMedium) state.preset = 'custom';
-    else if (state.preset === 'hard' && !isHard) state.preset = 'custom';
-
-    elements.presetCards.forEach(card => {
-      const isCurrent = card.dataset.preset === state.preset;
-      card.classList.toggle('active', isCurrent);
-      card.setAttribute('aria-checked', String(isCurrent));
-    });
-
-    StorageManager.updateBestRecordUI();
-  }
-
-  function selectTimeDuration(seconds) {
-    state.startingTime = seconds;
-    elements.timerChips.forEach(chip => {
-      chip.classList.toggle('active', parseInt(chip.dataset.time, 10) === seconds);
-    });
-    elements.customTimeInput.value = '';
-    SoundFX.playTap();
-  }
-
-  /* ==========================================================================
-     10b. LEVEL QUEST GAME CONTROLLER (20 questions / level, 80% to pass)
-     ========================================================================== */
-
-  // Switch config panel when mode changes
-  function switchGameMode(mode) {
-    state.gameMode = mode;
-    [elements.modeBtnStage, elements.modeBtnTime, elements.modeBtnLevelQuest].forEach(btn => {
-      const isCurrent = btn.dataset.mode === mode;
-      btn.classList.toggle('active', isCurrent);
-      btn.setAttribute('aria-checked', String(isCurrent));
-    });
-    if (elements.panelStageAdventure) {
-      elements.panelStageAdventure.classList.toggle('hidden', mode !== 'stageAdventure');
-    }
-    if (elements.panelTimeRush) {
-      elements.panelTimeRush.classList.toggle('hidden', mode !== 'timeRush');
-    }
-    if (elements.panelLevelQuest) {
-      elements.panelLevelQuest.classList.toggle('hidden', mode !== 'levelQuest');
-    }
-    if (elements.btnStartGame) {
-      const caption = elements.btnStartGame.querySelector('.btn-caption');
-      if (caption) {
-        if (mode === 'stageAdventure') {
-          caption.textContent = `START STAGE ${state.currentStage} 🚀`;
-        } else if (mode === 'levelQuest') {
-          caption.textContent = `START LEVEL ${state.currentLevel} 🏔️`;
-        } else {
-          caption.textContent = 'START GAME';
-        }
-      }
-    }
-    StorageManager.updateBestRecordUI();
-    if (mode === 'levelQuest') {
-      renderLevelGridUI();
-    } else {
-      renderStageGridUI();
-    }
-    SoundFX.playTap();
-  }
-
-  // Render level grid with unlock / stars state
-  function renderLevelGridUI() {
-    const unlocked = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.unlockedLevel) || 1;
-    const levelStars = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.stars) || {};
-    if (!elements.levelCards || elements.levelCards.length === 0) return;
-    elements.levelCards.forEach(card => {
-      const levelNum = parseInt(card.dataset.level, 10);
-      const isUnlocked = levelNum <= unlocked;
-      const isActive = levelNum === state.currentLevel;
-      card.classList.toggle('locked', !isUnlocked);
-      card.classList.toggle('active', isActive && isUnlocked);
-      card.setAttribute('aria-checked', String(isActive && isUnlocked));
-      card.setAttribute('aria-disabled', String(!isUnlocked));
-    });
-  }
-
-  // Start a Level Quest game
-  function startLevelQuest() {
-    state.isPlaying = true;
-    state.isPaused = false;
-    state.isSubmitting = false;
-    state.score = 0;
-    state.streak = 0;
-    state.bestStreak = 0;
-    state.playerLevel = 1;
-    state.highestLevelReached = 1;
-    state.correctCount = 0;
-    state.missedCount = 0;
-    state.totalAnswered = 0;
-    state.bonusTimeEarned = 0;
-    state.questionNumber = 0;
-    state.currentInput = '';
+}
+
+function _renderHistoryModal() {
+  // History modal rendering handled by existing code paths
+}
+
+/* ==========================================================================
+   GAME LOGIC
+   ========================================================================== */
+
+function startGame() {
+  state.questionNumber = 0;
+  state.score = 0;
+  state.streak = 0;
+  state.bestStreak = 0;
+  state.correctCount = 0;
+  state.missedCount = 0;
+  state.totalAnswered = 0;
+  state.bonusTimeEarned = 0;
+  state.isPlaying = true;
+  state.isSubmitting = false;
+
+  if (state.gameMode === 'stageAdventure') {
+    state.stageQuestionIndex = 0;
+  } else if (state.gameMode === 'levelQuest') {
     state.levelQuestionIndex = 0;
     state.levelCorrectCount = 0;
     state.levelMissedCount = 0;
-    elements.hudScore.textContent = '0';
-    elements.hudStreak.textContent = '0 🔥';
-    elements.hudMultiplier.textContent = '1x';
-    updateLevelHUD();
-    if (elements.hudTimerContainer) {
-      elements.hudTimerContainer.classList.add('level-quest-mode');
-    }
-    // Adjust HUD visibility for Level Quest (untimed)
-    if (elements.hudLevelCard) elements.hudLevelCard.classList.remove('hidden');
-    if (elements.hudStageCard) elements.hudStageCard.classList.add('hidden');
-    if (elements.hudStageProgressCard) elements.hudStageProgressCard.classList.remove('hidden');
-    if (elements.hudTimerContainer) elements.hudTimerContainer.classList.add('hidden');
-    if (elements.levelUpBanner) elements.levelUpBanner.classList.add('hidden');
-    if (elements.streakAchievementBanner) elements.streakAchievementBanner.classList.add('hidden');
-    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.add('hidden');
-    SoundFX.getAudioContext();
-    SoundFX.playTap();
-    switchScreen(elements.screenGame);
-    nextLevelQuestion();
   }
 
-  // Present the next Level Quest question (or finish the level)
-  function nextLevelQuestion() {
-    state.isSubmitting = false;
-    state.levelQuestionIndex++;
-    state.questionNumber++;
-    if (state.levelQuestionIndex > state.levelQuestionsTotal) {
-      showLevelResult();
-      return;
-    }
-    state.currentQuestion = MathEngine.generateStageQuestion(state.currentLevel);
-    state.currentInput = '';
-    elements.answerText.textContent = '';
-    elements.questionCounter.textContent = `Question #${state.levelQuestionIndex} / ${state.levelQuestionsTotal}`;
-    elements.termA.textContent = String(state.currentQuestion.a);
-    elements.termOp.textContent = state.currentQuestion.symbol;
-    elements.termB.textContent = String(state.currentQuestion.b);
-    elements.questionTierBadge.innerHTML = `🏔️ Level ${state.currentLevel} • ${state.currentQuestion.tierName} <span class="tier-bonus-text">(No timer)</span>`;
-    elements.userAnswerBox.className = 'user-answer-box active';
-    elements.feedbackBanner.className = 'feedback-banner';
-    elements.feedbackMascot.textContent = '🌟';
-    elements.feedbackMsg.textContent = 'Type your answer and tap GO!';
-  }
+  state.timerInitial = state.startingTime;
+  state.timeLeft = state.startingTime;
 
-  // Submit a Level Quest answer
-  function submitLevelAnswer() {
-    if (!state.isPlaying || state.isSubmitting) return;
-    if (!state.currentInput || state.currentInput.trim() === '') {
-      elements.userAnswerBox.classList.add('shake');
-      setTimeout(() => elements.userAnswerBox.classList.remove('shake'), 400);
-      elements.feedbackBanner.className = 'feedback-banner incorrect';
-      elements.feedbackMascot.textContent = '👉';
-      elements.feedbackMsg.textContent = 'Please enter an answer first!';
-      return;
-    }
-    state.isSubmitting = true;
-    const userAnswer = parseInt(state.currentInput, 10);
-    const expected = state.currentQuestion.answer;
-    state.totalAnswered++;
-    if (userAnswer === expected) {
-      state.correctCount++;
-      state.levelCorrectCount++;
-      state.streak++;
-      if (state.streak > state.bestStreak) { state.bestStreak = state.streak; }
-      let multiplier = 1.0;
-      if (state.streak >= 100) multiplier = 4.0;
-      else if (state.streak >= 50) multiplier = 3.0;
-      else if (state.streak >= 20) multiplier = 2.5;
-      else if (state.streak >= 10) multiplier = 2.0;
-      else if (state.streak >= 5) multiplier = 1.5;
-      else if (state.streak >= 3) multiplier = 1.25;
-      const ptsEarned = Math.round(state.currentQuestion.basePoints * multiplier);
-      state.score += ptsEarned;
-      elements.hudScore.textContent = String(state.score);
-      elements.hudStreak.textContent = `${state.streak} 🔥`;
-      elements.hudMultiplier.textContent = `${multiplier}x`;
-      elements.scorePopup.textContent = `+${ptsEarned}`;
-      elements.scorePopup.classList.remove('show');
-      void elements.scorePopup.offsetWidth;
-      elements.scorePopup.classList.add('show');
-      SoundFX.playCorrect(state.currentQuestion.tier);
-      const STREAK_MILESTONES = {
-        5: { bonus: 25, title: '5 IN A ROW!', kicker: '🔥 SUPER STREAK!', desc: '+25 Streak Bonus Points!', icon: '🔥' },
-        10: { bonus: 50, title: '10 IN A ROW!', kicker: '⚡ UNSTOPPABLE!', desc: '+50 Streak Bonus Points! 2x Multiplier Active!', icon: '⚡' },
-        20: { bonus: 100, title: '20 IN A ROW!', kicker: '🌟 MATH MASTER!', desc: '+100 Streak Bonus Points!', icon: '🌟' },
-        50: { bonus: 250, title: '50 IN A ROW!', kicker: '🚀 LEGENDARY HERO!', desc: '+250 Streak Bonus Points!', icon: '🚀' },
-        100: { bonus: 500, title: '100 IN A ROW!', kicker: '👑 MYTHIC GODLIKE!', desc: '+500 Streak Bonus Points!', icon: '👑' }
-      };
-      if (STREAK_MILESTONES[state.streak]) {
-        const ms = STREAK_MILESTONES[state.streak];
-        state.score += ms.bonus;
-        elements.hudScore.textContent = String(state.score);
-        triggerStreakMilestone(state.streak, ms);
-      } else if (state.streak % 5 === 0 && state.streak > 5) {
-        setTimeout(() => SoundFX.playStreak(), 200);
-      }
-      while (state.score >= getLevelThreshold(state.playerLevel)) {
-        state.playerLevel++;
-        if (state.playerLevel > state.highestLevelReached) {
-          state.highestLevelReached = state.playerLevel;
-        }
-        triggerLevelUp(state.playerLevel);
-      }
-      updateLevelHUD();
-      elements.userAnswerBox.className = 'user-answer-box correct';
-      elements.feedbackBanner.className = 'feedback-banner correct';
-      const phrase = CORRECT_PHRASES[Math.floor(Math.random() * CORRECT_PHRASES.length)];
-      elements.feedbackMascot.textContent = phrase.mascot;
-      elements.feedbackMsg.textContent = `${phrase.text} (+${ptsEarned} pts)`;
-      setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 350);
-    } else {
-      state.missedCount++;
-      state.levelMissedCount++;
-      state.streak = 0;
-      elements.hudStreak.textContent = '0 🔥';
-      elements.hudMultiplier.textContent = '1x';
-      SoundFX.playIncorrect();
-      elements.userAnswerBox.className = 'user-answer-box shake';
-      elements.feedbackBanner.className = 'feedback-banner incorrect';
-      const encouragement = ENCOURAGING_TRY_AGAIN[Math.floor(Math.random() * ENCOURAGING_TRY_AGAIN.length)];
-      elements.feedbackMascot.textContent = encouragement.mascot;
-      elements.feedbackMsg.textContent = `${encouragement.text} (Correct: ${expected})`;
-      setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 750);
-    }
-  }
+  gameView.show();
+  gameView.updateHUD();
+  gameView.startTimer((timeLeft) => {
+    state.timeLeft = timeLeft;
+  });
+  generateAndShowQuestion();
+}
 
-  // Skip a Level Quest question
-  function skipLevelQuestion() {
-    if (!state.isPlaying || state.isSubmitting) return;
-    state.isSubmitting = true;
-    state.totalAnswered++;
-    state.levelMissedCount++;
-    state.streak = 0;
-    elements.hudStreak.textContent = '0 🔥';
-    elements.hudMultiplier.textContent = '1x';
-    SoundFX.playIncorrect();
-    const expected = state.currentQuestion.answer;
-    elements.feedbackBanner.className = 'feedback-banner';
-    elements.feedbackMascot.textContent = '⏭️';
-    elements.feedbackMsg.textContent = `Skipped! The answer was ${expected}.`;
-    setTimeout(() => { if (state.isPlaying) { nextLevelQuestion(); } }, 450);
-  }
+function generateAndShowQuestion() {
+  state.questionNumber++;
 
-  // Show Level Quest result overlay (pass/fail)
-  function showLevelResult() {
-    state.isPlaying = false;
-    state.isSubmitting = false;
-    const total = state.levelQuestionsTotal;
-    const correct = state.levelCorrectCount;
-    const missed = state.levelMissedCount;
-    const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
-    const passed = accuracy >= 80;
-    const lvl = state.currentLevel;
-    if (passed) {
-      let stars = 1;
-      if (accuracy >= 95) stars = 3;
-      else if (accuracy >= 85) stars = 2;
-      const prevStars = state.saveData.levelProgress.stars[lvl] || 0;
-      if (stars > prevStars) { state.saveData.levelProgress.stars[lvl] = stars; }
-      if (accuracy > (state.saveData.levelProgress.bestAccuracy[lvl] || 0)) {
-        state.saveData.levelProgress.bestAccuracy[lvl] = accuracy;
-      }
-      if (state.score > (state.saveData.levelProgress.bestScore[lvl] || 0)) {
-        state.saveData.levelProgress.bestScore[lvl] = state.score;
-      }
-      const nextLevel = lvl + 1;
-      if (nextLevel > state.saveData.levelProgress.unlockedLevel) {
-        state.saveData.levelProgress.unlockedLevel = nextLevel;
-      }
-    }
-    StorageManager.saveData();
-    renderLevelGridUI();
-    if (elements.levelResultLevel) elements.levelResultLevel.textContent = String(lvl);
-    if (elements.levelResultAccuracy) elements.levelResultAccuracy.textContent = `${accuracy}%`;
-    if (elements.levelResultCorrect) elements.levelResultCorrect.textContent = `${correct} / ${total}`;
-    renderLevelResultPieChart(correct, missed);
-    if (passed) {
-      if (elements.levelResultMascot) elements.levelResultMascot.textContent = '🎉';
-      if (elements.levelResultTitle) {
-        elements.levelResultTitle.textContent = `LEVEL ${lvl} COMPLETE! 🎉`;
-        elements.levelResultTitle.style.color = '#059669';
-      }
-      if (elements.levelResultMessage) {
-        elements.levelResultMessage.textContent = `You scored ${accuracy}%! Level ${lvl} conquered!`;
-      }
-      if (elements.btnLevelNext) elements.btnLevelNext.classList.remove('hidden');
-      if (elements.btnLevelRetry) elements.btnLevelRetry.classList.add('hidden');
-      SoundFX.playCongrats();
-      triggerConfetti();
-    } else {
-      if (elements.levelResultMascot) elements.levelResultMascot.textContent = '😢';
-      if (elements.levelResultTitle) {
-        elements.levelResultTitle.textContent = `LEVEL ${lvl} NOT PASSED 😢`;
-        elements.levelResultTitle.style.color = '#dc2626';
-      }
-      if (elements.levelResultMessage) {
-        elements.levelResultMessage.textContent = `You scored ${accuracy}%. Need 80% to level up. Try again!`;
-      }
-      if (elements.btnLevelNext) elements.btnLevelNext.classList.add('hidden');
-      if (elements.btnLevelRetry) elements.btnLevelRetry.classList.remove('hidden');
-      SoundFX.playFailure();
-    }
-    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.remove('hidden');
-  }
-
-  // Hide Level Quest result overlay
-  function hideLevelResult() {
-    if (elements.levelResultOverlay) elements.levelResultOverlay.classList.add('hidden');
-  }
-
-  // Render Level Quest result pie chart
-  function renderLevelResultPieChart(correct, missed) {
-    const total = correct + missed;
-    const safeCorrect = total === 0 ? 1 : correct;
-    const safeMissed = total === 0 ? 0 : missed;
-    if (typeof Chart !== 'undefined') {
-      try {
-        if (elements.levelResultSvgFallback) elements.levelResultSvgFallback.classList.add('hidden');
-        if (elements.levelResultChartCanvas) elements.levelResultChartCanvas.classList.remove('hidden');
-        const ctx = elements.levelResultChartCanvas.getContext('2d');
-        new Chart(ctx, {
-          type: 'doughnut',
-          data: {
-            labels: ['Correct', 'Missed/Skipped'],
-            datasets: [{
-              data: [safeCorrect, safeMissed],
-              backgroundColor: ['#10b981', '#f87171'],
-              borderColor: ['#ffffff', '#ffffff'],
-              borderWidth: 4,
-              hoverOffset: 6
-            }]
-          },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            cutout: '68%'
-          }
-        });
-        return;
-      } catch (err) {
-        console.warn('Level result Chart.js failed, using SVG fallback', err);
-      }
-    }
-    if (elements.levelResultChartCanvas) elements.levelResultChartCanvas.classList.add('hidden');
-    if (elements.levelResultSvgFallback) elements.levelResultSvgFallback.classList.remove('hidden');
-    const correctPct = total > 0 ? Math.round((correct / total) * 100) : 0;
-    const radius = 60;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (correctPct / 100) * circumference;
-    elements.levelResultSvgFallback.innerHTML = `
-      <svg width="200" height="200" viewBox="0 0 160 160">
-        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#fecaca" stroke-width="24" />
-        <circle cx="80" cy="80" r="${radius}" fill="none" stroke="#10b981" stroke-width="24"
-          stroke-dasharray="${circumference}"
-          stroke-dashoffset="${strokeDashoffset}"
-          stroke-linecap="round"
-          transform="rotate(-90 80 80)"
-        />
-        <text x="80" y="72" text-anchor="middle" font-family="'Fredoka', sans-serif" font-weight="700" font-size="28" fill="#1e293b">
-          ${correctPct}%
-        </text>
-        <text x="80" y="96" text-anchor="middle" font-family="'Quicksand', sans-serif" font-weight="700" font-size="12" fill="#64748b">
-          ACCURACY
-        </text>
-      </svg>
-    `;
-  }
-
-  /* ==========================================================================
-     11. EVENT LISTENERS SETUP
-     ========================================================================== */
-  function setupEventListeners() {
-    // Header navigation
-    elements.headerHomeBtn.addEventListener('click', () => {
-      if (state.isPlaying) {
-        elements.modalConfirmQuit.classList.remove('hidden');
-      } else {
-        switchScreen(elements.screenConfig);
-      }
-    });
-
-    elements.headerHomeBtn.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        elements.headerHomeBtn.click();
-      }
-    });
-
-    // Mode Selection: Stage Adventure / Time Rush / Level Quest
-    elements.modeBtnStage.addEventListener('click', () => switchGameMode('stageAdventure'));
-    elements.modeBtnTime.addEventListener('click', () => switchGameMode('timeRush'));
-    elements.modeBtnLevelQuest.addEventListener('click', () => switchGameMode('levelQuest'));
-
-    elements.btnSoundToggle.addEventListener('click', () => {
-      StorageManager.toggleSound();
-    });
-
-    elements.btnOpenHistory.addEventListener('click', () => {
-      renderHistoryModal();
-    });
-
-    // Preset Selection
-    elements.presetCards.forEach(card => {
-      card.addEventListener('click', () => {
-        applyPreset(card.dataset.preset);
-      });
-    });
-
-    // Level Quest Level Selection
-    elements.levelCards.forEach(card => {
-      card.addEventListener('click', () => {
-        if (card.classList.contains('locked')) return;
-        state.currentLevel = parseInt(card.dataset.level, 10);
-        renderLevelGridUI();
-        if (elements.btnStartGame) {
-          const caption = elements.btnStartGame.querySelector('.btn-caption');
-          if (caption) caption.textContent = `START LEVEL ${state.currentLevel} 🏔️`;
-        }
-        SoundFX.playTap();
-      });
-    });
-
-    // Operation Checkboxes
-    Object.values(elements.opCheckboxes).forEach(cb => {
-      cb.addEventListener('change', () => {
-        validateSettings();
-        SoundFX.playTap();
-      });
-    });
-
-    // Timer chips
-    elements.timerChips.forEach(chip => {
-      chip.addEventListener('click', () => {
-        selectTimeDuration(parseInt(chip.dataset.time, 10));
-      });
-    });
-
-    // Custom time input
-    elements.customTimeInput.addEventListener('input', (e) => {
-      const val = parseInt(e.target.value, 10);
-      if (val && val >= 10 && val <= 600) {
-        state.startingTime = val;
-        elements.timerChips.forEach(chip => chip.classList.remove('active'));
-      }
-    });
-
-    // Start Game
-    elements.btnStartGame.addEventListener('click', () => {
-      startGame();
-    });
-
-    // Landing Page: Game Card Selection
-    elements.gameCards.forEach(card => {
-      card.addEventListener('click', () => {
-        if (card.classList.contains('disabled')) return;
-        elements.gameCards.forEach(c => {
-          c.classList.remove('active');
-          c.setAttribute('aria-checked', 'false');
-        });
-        card.classList.add('active');
-        card.setAttribute('aria-checked', 'true');
-        elements.selectedGame = card.dataset.game || 'math-blast';
-        SoundFX.playTap();
-      });
-    });
-
-    // Landing Page: Play Selected Game
-    elements.btnPlaySelectedGame.addEventListener('click', () => {
-      if (elements.selectedGame === 'math-blast') {
-        elements.screenLanding.classList.remove('active');
-        elements.screenConfig.classList.add('active');
-      } else {
-        SoundFX.playTap();
-      }
-    });
-
-    // On-screen keypad digits
-    elements.keypadBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        appendDigit(btn.dataset.key);
-      });
-    });
-
-    elements.keyClear.addEventListener('click', () => {
-      clearInput();
-    });
-
-    elements.keyBackspace.addEventListener('click', () => {
-      backspaceDigit();
-    });
-
-    elements.btnSubmitAnswer.addEventListener('click', () => {
-      submitAnswer();
-    });
-
-    elements.btnSkipQuestion.addEventListener('click', () => {
-      skipQuestion();
-    });
-
-    // Physical Keyboard Support
-    window.addEventListener('keydown', (e) => {
-      // Don't intercept if typing in custom time input or modals
-      if (e.target === elements.customTimeInput) return;
-      if (!elements.modalHistory.classList.contains('hidden')) {
-        if (e.key === 'Escape') elements.modalHistory.classList.add('hidden');
-        return;
-      }
-      if (!elements.modalConfirmClear.classList.contains('hidden')) {
-        if (e.key === 'Escape') elements.modalConfirmClear.classList.add('hidden');
-        return;
-      }
-      if (!elements.modalConfirmQuit.classList.contains('hidden')) {
-        if (e.key === 'Escape') elements.modalConfirmQuit.classList.add('hidden');
-        return;
-      }
-
-      if (state.isPlaying) {
-        if (e.key >= '0' && e.key <= '9') {
-          e.preventDefault();
-          appendDigit(e.key);
-        } else if (e.key === 'Backspace') {
-          e.preventDefault();
-          backspaceDigit();
-        } else if (e.key === 'Enter') {
-          e.preventDefault();
-          submitAnswer();
-        } else if (e.key === 'Escape') {
-          e.preventDefault();
-          elements.modalConfirmQuit.classList.remove('hidden');
-        } else if (e.key === 'c' || e.key === 'C') {
-          e.preventDefault();
-          clearInput();
-        } else if (e.key === 's' || e.key === 'S') {
-          e.preventDefault();
-          skipQuestion();
-        }
-      }
-    });
-
-    // Quit in-game
-    elements.btnQuitGame.addEventListener('click', () => {
-      elements.modalConfirmQuit.classList.remove('hidden');
-    });
-
-    elements.btnResumeGame.addEventListener('click', () => {
-      elements.modalConfirmQuit.classList.add('hidden');
-    });
-
-    elements.btnReallyQuit.addEventListener('click', () => {
-      elements.modalConfirmQuit.classList.add('hidden');
-      state.isPlaying = false;
-      if (state.timerIntervalId) clearInterval(state.timerIntervalId);
-      switchScreen(elements.screenConfig);
-    });
-
-    // Summary screen buttons
-    elements.btnPlayAgain.addEventListener('click', () => {
-      startGame();
-    });
-
-    elements.btnChangeSettings.addEventListener('click', () => {
-      switchScreen(elements.screenConfig);
-    });
-
-    elements.btnSummaryHistory.addEventListener('click', () => {
-      renderHistoryModal();
-    });
-
-    // Level Quest Result Overlay Buttons
-    elements.btnLevelNext.addEventListener('click', () => {
-      hideLevelResult();
-      // Advance to next unlocked level if available
-      const unlocked = (state.saveData && state.saveData.levelProgress && state.saveData.levelProgress.unlockedLevel) || 1;
-      const nextLevel = Math.min(state.currentLevel + 1, unlocked);
-      state.currentLevel = nextLevel;
-      renderLevelGridUI();
-      startLevelQuest();
-    });
-
-    elements.btnLevelRetry.addEventListener('click', () => {
-      hideLevelResult();
-      startLevelQuest();
-    });
-
-    elements.btnLevelQuit.addEventListener('click', () => {
-      hideLevelResult();
-      state.isPlaying = false;
-      if (state.timerIntervalId) clearInterval(state.timerIntervalId);
-      switchScreen(elements.screenConfig);
-    });
-
-    // History Modal
-    elements.btnCloseHistory.addEventListener('click', () => {
-      elements.modalHistory.classList.add('hidden');
-    });
-
-    elements.tabScoreTrend.addEventListener('click', () => {
-      elements.tabScoreTrend.classList.add('active');
-      elements.tabAccuracyTrend.classList.remove('active');
-      elements.viewScoreTrend.classList.remove('hidden');
-      elements.viewAccuracyTrend.classList.add('hidden');
-    });
-
-    elements.tabAccuracyTrend.addEventListener('click', () => {
-      elements.tabAccuracyTrend.classList.add('active');
-      elements.tabScoreTrend.classList.remove('active');
-      elements.viewAccuracyTrend.classList.remove('hidden');
-      elements.viewScoreTrend.classList.add('hidden');
-    });
-
-    elements.btnClearHistory.addEventListener('click', () => {
-      elements.modalConfirmClear.classList.remove('hidden');
-    });
-
-    elements.btnCancelClear.addEventListener('click', () => {
-      elements.modalConfirmClear.classList.add('hidden');
-    });
-
-    elements.btnConfirmClear.addEventListener('click', () => {
-      StorageManager.clearAll();
-      elements.modalConfirmClear.classList.add('hidden');
-    });
-
-    // Close modals when clicking backdrop
-    [elements.modalHistory, elements.modalConfirmClear, elements.modalConfirmQuit].forEach(modal => {
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-          modal.classList.add('hidden');
-        }
-      });
-    });
-  }
-
-  /* ==========================================================================
-     12. INITIALIZATION
-     ========================================================================== */
-  function init() {
-    StorageManager.init();
-    setupEventListeners();
-    applyPreset('easy');
-    selectTimeDuration(60);
-  }
-
-  // Boot up when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+  let question;
+  if (state.gameMode === 'stageAdventure') {
+    question = mathEngine.generateStageQuestion(state.currentStage);
+    question.tierName = `Stage ${state.currentStage}`;
   } else {
-    init();
+    question = mathEngine.generateQuestion();
   }
 
-})();
+  state.currentQuestion = question;
+  state.currentInput = '';
+  gameView.renderQuestion(question);
+  gameView.updateHUD();
+}
+
+function appendDigit(digit) {
+  if (state.isSubmitting) return;
+  if (state.currentInput.length >= 6) return;
+  state.currentInput += digit;
+  elements.answerText.textContent = state.currentInput;
+}
+
+function clearInput() {
+  state.currentInput = '';
+  elements.answerText.textContent = '';
+}
+
+function backspaceDigit() {
+  state.currentInput = state.currentInput.slice(0, -1);
+  elements.answerText.textContent = state.currentInput;
+}
+
+function submitAnswer() {
+  if (state.isSubmitting || !state.currentQuestion) return;
+  if (state.currentInput.trim() === '') return;
+
+  state.isSubmitting = true;
+
+  const userVal = parseInt(state.currentInput, 10);
+  const correct = userVal === state.currentQuestion.answer;
+
+  if (correct) {
+    state.correctCount++;
+    state.streak++;
+    if (state.streak > state.bestStreak) state.bestStreak = state.streak;
+
+    const multiplier = gameView._getStreakMultiplier();
+    const basePts = state.currentQuestion.basePoints || 10;
+    const earned = Math.floor(basePts * multiplier);
+    state.score += earned;
+
+    const bonus = state.currentQuestion.bonusSeconds || 0;
+    if (bonus > 0) {
+      gameView.addBonusTime(bonus);
+    }
+
+    gameView.showScorePopup(earned);
+    gameView.showFeedback(true, state.currentQuestion);
+
+    if (state.streak === 5) gameView.showStreakMilestone(5, 25);
+    else if (state.streak === 10) gameView.showStreakMilestone(10, 50);
+    else if (state.streak === 20) gameView.showStreakMilestone(20, 100);
+    else if (state.streak === 50) gameView.showStreakMilestone(50, 250);
+    else if (state.streak === 100) gameView.showStreakMilestone(100, 500);
+
+    if (state.gameMode !== 'stageAdventure') {
+      if (state.correctCount % 5 === 0 && state.playerLevel < 8) {
+        state.playerLevel++;
+        state.highestLevelReached = Math.max(state.highestLevelReached, state.playerLevel);
+        gameView.showLevelUpBanner(state.playerLevel);
+        gameView.addBonusTime(5);
+      }
+    }
+  } else {
+    state.missedCount++;
+    state.streak = 0;
+    gameView.showFeedback(false, state.currentQuestion);
+  }
+
+  state.totalAnswered++;
+
+  setTimeout(() => {
+    state.isSubmitting = false;
+    advanceQuestion();
+  }, 900);
+}
+
+function skipQuestion() {
+  if (state.isSubmitting || !state.isPlaying) return;
+  state.missedCount++;
+  state.streak = 0;
+  state.totalAnswered++;
+  gameView.showFeedback(false, state.currentQuestion);
+  state.isSubmitting = true;
+  setTimeout(() => {
+    state.isSubmitting = false;
+    advanceQuestion();
+  }, 900);
+}
+
+function advanceQuestion() {
+  if (!state.isPlaying) return;
+
+  let roundOver = false;
+
+  if (state.gameMode === 'stageAdventure') {
+    state.stageQuestionIndex++;
+    if (state.stageQuestionIndex >= state.stageQuestionsTotal) {
+      roundOver = true;
+    }
+  } else if (state.gameMode === 'timeRush') {
+    if (state.timeLeft <= 0) {
+      roundOver = true;
+    }
+  } else if (state.gameMode === 'levelQuest') {
+    state.levelQuestionIndex++;
+    if (state.levelQuestionIndex >= state.levelQuestionsTotal) {
+      roundOver = true;
+    }
+  }
+
+  if (roundOver) {
+    endGame();
+  } else {
+    generateAndShowQuestion();
+  }
+}
+
+function endGame() {
+  state.isPlaying = false;
+  gameView.destroy();
+  gameView.hide();
+
+  const accuracy = state.totalAnswered > 0
+    ? Math.round((state.correctCount / state.totalAnswered) * 100)
+    : 0;
+
+  let stageCleared = false;
+  let starsEarned = 0;
+
+  if (state.gameMode === 'stageAdventure') {
+    stageCleared = mathBlastGame.isStageCleared(state.correctCount, state.stageQuestionsTotal);
+    starsEarned = mathBlastGame.getStarsForAccuracy(accuracy);
+
+    if (stageCleared) {
+      const nextUnlocked = Math.max(state.saveData.stageProgress.unlockedStage, state.currentStage + 1);
+      state.saveData.stageProgress.unlockedStage = nextUnlocked;
+    }
+    state.saveData.stageProgress.stars[state.currentStage] = Math.max(
+      state.saveData.stageProgress.stars[state.currentStage] || 0, starsEarned
+    );
+    state.saveData.stageProgress.bestAccuracy[state.currentStage] = Math.max(
+      state.saveData.stageProgress.bestAccuracy[state.currentStage] || 0, accuracy
+    );
+    state.saveData.stageProgress.bestScore[state.currentStage] = Math.max(
+      state.saveData.stageProgress.bestScore[state.currentStage] || 0, state.score
+    );
+  }
+
+  const prevBest = state.saveData.highScores[state.preset] || 0;
+  const isHighScore = state.score > prevBest;
+  if (isHighScore) {
+    state.saveData.highScores[state.preset] = state.score;
+    state.saveData.bestAccuracy[state.preset] = Math.max(
+      state.saveData.bestAccuracy[state.preset] || 0, accuracy
+    );
+    if (sound) sound.playHighScoreFanfare();
+  }
+
+  state.saveData.history.push({
+    timestamp: new Date().toISOString(),
+    mode: state.gameMode,
+    stage: state.currentStage,
+    level: state.currentLevel,
+    score: state.score,
+    accuracy: accuracy,
+    correct: state.correctCount,
+    missed: state.missedCount,
+    duration: Math.max(0, state.timerInitial - state.timeLeft),
+    preset: state.preset
+  });
+
+  storage.saveData();
+
+  const results = {
+    score: state.score,
+    maxLevel: state.playerLevel,
+    accuracy: accuracy,
+    correct: state.correctCount,
+    missed: state.missedCount,
+    bestStreak: state.bestStreak,
+    bonusTimeEarned: state.bonusTimeEarned,
+    isHighScore: isHighScore,
+    stageCleared: stageCleared,
+    starsEarned: starsEarned
+  };
+
+  summaryView.setOnPlayAgain(() => startGame());
+  summaryView.setOnChangeSettings(() => {
+    _switchScreen(elements.screenConfig);
+  });
+  summaryView.setOnViewHistory(() => {
+    elements.modalHistory.classList.remove('hidden');
+  });
+  if (state.gameMode === 'stageAdventure') {
+    summaryView.setOnNextStage(() => {
+      state.currentStage = Math.min(state.currentStage + 1, state.saveData.stageProgress.unlockedStage);
+      _renderStageGridUI();
+      startGame();
+    });
+  }
+
+  summaryView.render(results);
+  summaryView.show();
+
+  if (isHighScore && typeof confetti !== 'undefined') {
+    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+  }
+}
+
+/* ==========================================================================
+   EVENT BINDING
+   ========================================================================== */
+
+function _bindGlobalEvents() {
+  elements.headerHomeBtn.addEventListener('click', () => {
+    _switchScreen(elements.screenLanding);
+    if (sound) sound.playTap();
+  });
+
+  elements.btnSoundToggle.addEventListener('click', () => {
+    storage.toggleSound();
+  });
+
+  elements.btnOpenHistory.addEventListener('click', () => {
+    elements.modalHistory.classList.remove('hidden');
+    if (sound) sound.playTap();
+  });
+
+  elements.keypadBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      appendDigit(btn.dataset.key);
+      if (sound) sound.playTap();
+    });
+  });
+
+  elements.keyClear.addEventListener('click', () => {
+    clearInput();
+    if (sound) sound.playTap();
+  });
+
+  elements.keyBackspace.addEventListener('click', () => {
+    backspaceDigit();
+    if (sound) sound.playTap();
+  });
+
+  elements.btnSubmitAnswer.addEventListener('click', () => {
+    submitAnswer();
+  });
+
+  elements.btnSkipQuestion.addEventListener('click', () => {
+    skipQuestion();
+    if (sound) sound.playTap();
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.target === elements.customTimeInput) return;
+
+    if (!elements.modalHistory.classList.contains('hidden')) {
+      if (e.key === 'Escape') elements.modalHistory.classList.add('hidden');
+      return;
+    }
+    if (!elements.modalConfirmClear.classList.contains('hidden')) {
+      if (e.key === 'Escape') elements.modalConfirmClear.classList.add('hidden');
+      return;
+    }
+    if (!elements.modalConfirmQuit.classList.contains('hidden')) {
+      if (e.key === 'Escape') elements.modalConfirmQuit.classList.add('hidden');
+      return;
+    }
+
+    if (state.isPlaying) {
+      if (e.key >= '0' && e.key <= '9') {
+        e.preventDefault();
+        appendDigit(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        backspaceDigit();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        submitAnswer();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        elements.modalConfirmQuit.classList.remove('hidden');
+      } else if (e.key === 'c' || e.key === 'C') {
+        e.preventDefault();
+        clearInput();
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        skipQuestion();
+      }
+    }
+  });
+
+  elements.btnQuitGame.addEventListener('click', () => {
+    elements.modalConfirmQuit.classList.remove('hidden');
+  });
+
+  elements.btnResumeGame.addEventListener('click', () => {
+    elements.modalConfirmQuit.classList.add('hidden');
+  });
+
+  elements.btnReallyQuit.addEventListener('click', () => {
+    elements.modalConfirmQuit.classList.add('hidden');
+    state.isPlaying = false;
+    gameView.destroy();
+    gameView.hide();
+    _switchScreen(elements.screenConfig);
+  });
+
+  elements.btnCancelClear.addEventListener('click', () => {
+    elements.modalConfirmClear.classList.add('hidden');
+  });
+
+  elements.btnConfirmClear.addEventListener('click', () => {
+    storage.clearAll();
+    elements.modalConfirmClear.classList.add('hidden');
+  });
+
+  [elements.modalHistory, elements.modalConfirmClear, elements.modalConfirmQuit].forEach(modal => {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.add('hidden');
+    });
+  });
+}
+
+/* ==========================================================================
+   BOOT
+   ========================================================================== */
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
