@@ -304,3 +304,4 @@ export class GameView {
     this.stopTimer();
     this.hideBanners();
   }
+}

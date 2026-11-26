@@ -218,3 +218,4 @@ export class StorageManager {
     if (bestScoreVal) bestScoreVal.textContent = `${bestScore} pts`;
     if (bestAccVal) bestAccVal.textContent = `${bestAcc}%`;
   }
+}

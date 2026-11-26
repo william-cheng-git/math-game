@@ -176,3 +176,4 @@ export class MathEngine {
 
     return { a, b, op, symbol, answer, tier, tierName, bonusSeconds, basePoints };
   }
+}

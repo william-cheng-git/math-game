@@ -165,6 +165,7 @@ function _captureElements() {
   elements.btnStartGame = get('btn-start-game');
   elements.stageCards = getAll('.stage-grid .stage-card');
   elements.levelCards = getAll('.level-grid .level-card');
+}
 
 /* ==========================================================================
    DOM ELEMENT CAPTURE (Part 2: gameplay HUD)
